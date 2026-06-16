@@ -13,6 +13,7 @@ import {
   GraduationCap,
   LogOut,
   Menu,
+  Settings,
   X,
 } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
@@ -29,7 +30,7 @@ const navItems = [
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, signOut } = useAuth();
+  const { user, signOut, isAdmin } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const isActive = (href: string) => {
@@ -69,6 +70,22 @@ export function Sidebar() {
             </Link>
           );
         })}
+        {isAdmin && (
+          <>
+            <div className="my-2 border-t border-gray-200" />
+            <Link
+              href="/settings"
+              onClick={() => setMobileOpen(false)}
+              className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                isActive("/settings") ? "text-white" : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+              }`}
+              style={isActive("/settings") ? { backgroundColor: "#1e3a5f" } : undefined}
+            >
+              <Settings className={`h-5 w-5 ${isActive("/settings") ? "text-white" : "text-gray-500"}`} />
+              <span>Settings</span>
+            </Link>
+          </>
+        )}
       </nav>
 
       {user && (

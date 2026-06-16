@@ -31,14 +31,14 @@ const summaryCards = [
     label: "Upcoming Appointments",
     icon: Calendar,
     bg: "bg-green-500",
-    href: "/appointments",
+    href: "/scheduling",
   },
   {
     key: "pendingFollowUps" as const,
     label: "Pending Follow-Ups",
     icon: ClipboardList,
     bg: "bg-yellow-500",
-    href: "/appointments?type=FOLLOW_UP",
+    href: "/scheduling?type=FOLLOW_UP",
   },
   {
     key: "readyToBill" as const,
