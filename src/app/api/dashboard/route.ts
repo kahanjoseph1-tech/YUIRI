@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { getCollection, where } from "@/lib/db";
+import { getCollection } from "@/lib/db";
 import { Client, Appointment, Evaluation, BillingRecord } from "@/lib/types";
 
 interface ActivityItem {
@@ -10,85 +9,16 @@ interface ActivityItem {
   id: string;
 }
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const role = user.role;
-
-    // BILLING role: only billing-related stats
-    if (role === "BILLING") {
-      const billingRecords = await getCollection<BillingRecord>("billing", []);
-
-      const readyToBill = billingRecords.filter(
-        (r) => r.billingStatus === "NOT_BILLED"
-      ).length;
-
-      const unpaidTotal = billingRecords
-        .filter(
-          (r) =>
-            r.billingStatus === "INVOICE_SENT" ||
-            r.billingStatus === "PARTIALLY_PAID"
-        )
-        .reduce((sum, r) => sum + (r.amount || 0), 0);
-
-      const recentActivity: ActivityItem[] = billingRecords
-        .sort(
-          (a, b) =>
-            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-        )
-        .slice(0, 10)
-        .map((r) => ({
-          type: "billing",
-          description: `Billing record ${r.invoiceNumber || r.id} - ${r.billingStatus}`,
-          timestamp: r.updatedAt,
-          id: r.id,
-        }));
-
-      return NextResponse.json({
-        newLeads: 0,
-        upcomingAppointments: 0,
-        pendingFollowUps: 0,
-        readyToBill,
-        unpaidTotal,
-        recentActivity,
-      });
-    }
-
-    // For EVALUATOR: filter to only their items
-    const isEvaluator = role === "EVALUATOR";
-
-    // Fetch all collections (with evaluator filtering where applicable)
-    const clientConstraints: Parameters<typeof where>[] = [];
+    // Fetch all collections
     const clients = await getCollection<Client>("clients", []);
-
-    const appointmentConstraints = isEvaluator
-      ? [where("evaluatorId", "==", user.id)]
-      : [];
-    const appointments = await getCollection<Appointment>(
-      "appointments",
-      appointmentConstraints
-    );
-
-    const evaluationConstraints = isEvaluator
-      ? [where("evaluatorId", "==", user.id)]
-      : [];
-    const evaluations = await getCollection<Evaluation>(
-      "evaluations",
-      evaluationConstraints
-    );
-
-    const billingRecords = isEvaluator
-      ? []
-      : await getCollection<BillingRecord>("billing", []);
+    const appointments = await getCollection<Appointment>("appointments", []);
+    const evaluations = await getCollection<Evaluation>("evaluations", []);
+    const billingRecords = await getCollection<BillingRecord>("billing", []);
 
     // Calculate stats
-    const newLeads = isEvaluator
-      ? 0
-      : clients.filter((c) => c.status === "NEW_LEAD").length;
+    const newLeads = clients.filter((c) => c.status === "NEW_LEAD").length;
 
     const now = new Date();
     const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -103,32 +33,28 @@ export async function GET(request: NextRequest) {
       (e) => e.status === "PENDING" || e.status === "IN_PROGRESS"
     ).length;
 
-    const readyToBill = isEvaluator
-      ? 0
-      : billingRecords.filter((r) => r.billingStatus === "NOT_BILLED").length;
+    const readyToBill = billingRecords.filter(
+      (r) => r.billingStatus === "NOT_BILLED"
+    ).length;
 
-    const unpaidTotal = isEvaluator
-      ? 0
-      : billingRecords
-          .filter(
-            (r) =>
-              r.billingStatus === "INVOICE_SENT" ||
-              r.billingStatus === "PARTIALLY_PAID"
-          )
-          .reduce((sum, r) => sum + (r.amount || 0), 0);
+    const unpaidTotal = billingRecords
+      .filter(
+        (r) =>
+          r.billingStatus === "INVOICE_SENT" ||
+          r.billingStatus === "PARTIALLY_PAID"
+      )
+      .reduce((sum, r) => sum + (r.amount || 0), 0);
 
     // Recent activity: last 10 items across all collections sorted by updatedAt desc
     const allActivity: ActivityItem[] = [];
 
     clients.forEach((c) => {
-      if (!isEvaluator) {
-        allActivity.push({
-          type: "client",
-          description: `Client ${c.boyFirstName} ${c.boyLastName} - ${c.status}`,
-          timestamp: c.updatedAt,
-          id: c.id,
-        });
-      }
+      allActivity.push({
+        type: "client",
+        description: `Client ${c.boyFirstName} ${c.boyLastName} - ${c.status}`,
+        timestamp: c.updatedAt,
+        id: c.id,
+      });
     });
 
     appointments.forEach((a) => {

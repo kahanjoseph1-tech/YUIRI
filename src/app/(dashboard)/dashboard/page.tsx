@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useSession } from "next-auth/react";
 import { Users, Calendar, ClipboardList, DollarSign, AlertCircle } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -65,7 +64,6 @@ function formatCurrency(amount: number): string {
 }
 
 export default function DashboardPage() {
-  const { data: session } = useSession();
   const { toast } = useToast();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -92,21 +90,7 @@ export default function DashboardPage() {
     fetchDashboard();
   }, [toast]);
 
-  const role = session?.user?.role;
-
-  // Filter cards based on role
-  const visibleCards = summaryCards.filter((card) => {
-    if (role === "EVALUATOR") {
-      return ["upcomingAppointments", "pendingFollowUps"].includes(card.key);
-    }
-    if (role === "BILLING") {
-      return ["readyToBill", "unpaidTotal"].includes(card.key);
-    }
-    if (role === "SCHEDULER") {
-      return ["newLeads", "upcomingAppointments", "pendingFollowUps"].includes(card.key);
-    }
-    return true; // ADMIN sees all
-  });
+  const visibleCards = summaryCards;
 
   if (loading) {
     return (

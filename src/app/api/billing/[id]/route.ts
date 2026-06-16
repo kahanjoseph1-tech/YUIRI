@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { getDocument, getCollection, updateDocument, where } from "@/lib/db";
+import { getDocument, getCollection, updateDocument } from "@/lib/db";
 import { BillingRecord, Client } from "@/lib/types";
 import { generateInvoiceNumber } from "@/lib/utils";
 
@@ -9,11 +8,6 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { id } = await params;
     const record = await getDocument<BillingRecord>("billing", id);
     if (!record) {
@@ -43,11 +37,6 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { id } = await params;
     const existing = await getDocument<BillingRecord>("billing", id);
     if (!existing) {

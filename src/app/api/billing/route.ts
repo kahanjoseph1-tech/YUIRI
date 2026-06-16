@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, hasRole } from "@/lib/auth";
 import {
   getCollection,
   getDocument,
@@ -7,15 +6,10 @@ import {
   where,
   orderBy,
 } from "@/lib/db";
-import { BillingRecord, Client, UserRole } from "@/lib/types";
+import { BillingRecord, Client } from "@/lib/types";
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { searchParams } = new URL(request.url);
     const billingStatus = searchParams.get("billingStatus");
     const startDate = searchParams.get("startDate");
@@ -59,15 +53,6 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    if (!hasRole(user.role, ["ADMIN", "BILLING"] as UserRole[])) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
     const body = await request.json();
     const { clientId, serviceType, appointmentDate, amount, billingStatus, notes } =
       body;

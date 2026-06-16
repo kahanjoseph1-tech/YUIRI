@@ -1,22 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
 import {
   getDocument,
   updateDocument,
   createDocument,
 } from "@/lib/db";
-import { Evaluation, Client, Appointment, BillingRecord } from "@/lib/types";
+import { Evaluation, Client, Appointment } from "@/lib/types";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { id } = await params;
     const evaluation = await getDocument<Evaluation>("evaluations", id);
     if (!evaluation) {
@@ -50,11 +44,6 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { id } = await params;
     const existing = await getDocument<Evaluation>("evaluations", id);
     if (!existing) {

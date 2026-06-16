@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
 import {
   getCollection,
   getDocument,
@@ -7,25 +6,17 @@ import {
   where,
   orderBy,
 } from "@/lib/db";
-import { Evaluation, Client, User } from "@/lib/types";
+import { Evaluation, Client } from "@/lib/types";
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { searchParams } = new URL(request.url);
     const evaluatorId = searchParams.get("evaluatorId");
     const status = searchParams.get("status");
 
     const constraints = [];
 
-    // EVALUATOR role users only see their own evaluations
-    if (user.role === "EVALUATOR") {
-      constraints.push(where("evaluatorId", "==", user.id));
-    } else if (evaluatorId) {
+    if (evaluatorId) {
       constraints.push(where("evaluatorId", "==", evaluatorId));
     }
 
@@ -64,11 +55,6 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const body = await request.json();
     const {
       appointmentId,

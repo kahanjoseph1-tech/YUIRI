@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
-import bcrypt from "bcryptjs";
 
 const SEED_SECRET = process.env.SEED_SECRET || "SEED_SECRET_123";
 
@@ -46,31 +45,27 @@ export async function GET(request: NextRequest) {
       await clearCollection(col);
     }
 
-    // --- Users ---
+    // --- Users (just sample evaluator/staff records for linking) ---
     const users = [
-      { name: "Admin User", email: "admin@yuiri.com", password: "admin123", role: "ADMIN" },
-      { name: "Sarah Scheduler", email: "scheduler@yuiri.com", password: "scheduler123", role: "SCHEDULER" },
-      { name: "Eli Evaluator", email: "evaluator@yuiri.com", password: "evaluator123", role: "EVALUATOR" },
-      { name: "Beth Billing", email: "billing@yuiri.com", password: "billing123", role: "BILLING" },
+      { name: "Eli Evaluator", email: "evaluator@yuiri.com" },
+      { name: "Sarah Scheduler", email: "scheduler@yuiri.com" },
     ];
 
     const userBatch = adminDb.batch();
     const userIds: string[] = [];
     for (const u of users) {
       const ref = adminDb.collection("users").doc();
-      const hashed = await bcrypt.hash(u.password, 10);
       userBatch.set(ref, {
         name: u.name,
         email: u.email,
-        password: hashed,
-        role: u.role,
         createdAt: now,
         updatedAt: now,
       });
       userIds.push(ref.id);
     }
     await userBatch.commit();
-    const [adminId, , evaluatorId] = userIds;
+    const evaluatorId = userIds[0];
+    const adminId = userIds[0];
 
     // --- Clients ---
     const clients = [
@@ -198,12 +193,7 @@ export async function GET(request: NextRequest) {
         evaluations: evaluations.length,
         billingRecords: billingRecords.length,
       },
-      credentials: {
-        admin: "admin@yuiri.com / admin123",
-        scheduler: "scheduler@yuiri.com / scheduler123",
-        evaluator: "evaluator@yuiri.com / evaluator123",
-        billing: "billing@yuiri.com / billing123",
-      },
+      note: "Sign in with any Google account at /login.",
     });
   } catch (error) {
     console.error("Seed failed:", error);

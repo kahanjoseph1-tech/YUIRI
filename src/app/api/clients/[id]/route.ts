@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, hasRole } from "@/lib/auth";
 import {
   getDocument,
   getCollection,
@@ -7,18 +6,13 @@ import {
   deleteDocument,
   where,
 } from "@/lib/db";
-import { Client, Appointment, Evaluation, BillingRecord, UserRole } from "@/lib/types";
+import { Client, Appointment, Evaluation, BillingRecord } from "@/lib/types";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { id } = await params;
     const client = await getDocument<Client>("clients", id);
     if (!client) {
@@ -57,11 +51,6 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { id } = await params;
     const existing = await getDocument<Client>("clients", id);
     if (!existing) {
@@ -87,15 +76,6 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    if (!hasRole(user.role, ["ADMIN"] as UserRole[])) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
     const { id } = await params;
     const existing = await getDocument<Client>("clients", id);
     if (!existing) {
