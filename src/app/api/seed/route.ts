@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import bcrypt from "bcryptjs";
 
-const SEED_SECRET = "SEED_SECRET_123";
+const SEED_SECRET = process.env.SEED_SECRET || "SEED_SECRET_123";
 
 function isoNow(): string {
   return new Date().toISOString();
