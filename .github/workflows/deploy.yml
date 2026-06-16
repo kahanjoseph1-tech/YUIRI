@@ -21,4 +21,5 @@ jobs:
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa-key.json
           export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa-key.json
+          npx firebase-tools experiments:enable webframeworks
           npx firebase-tools deploy --project yuiri-1f4d3 --non-interactive --force
