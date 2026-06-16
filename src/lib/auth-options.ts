@@ -1,7 +1,6 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { collection, query, where, getDocs } from "firebase/firestore";
-import { db } from "./firebase";
+import { adminDb } from "./firebase-admin";
 import bcrypt from "bcryptjs";
 import { User } from "./types";
 
@@ -16,9 +15,11 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
-        const usersRef = collection(db, "users");
-        const q = query(usersRef, where("email", "==", credentials.email));
-        const snapshot = await getDocs(q);
+        const snapshot = await adminDb
+          .collection("users")
+          .where("email", "==", credentials.email.trim().toLowerCase())
+          .limit(1)
+          .get();
 
         if (snapshot.empty) return null;
 
