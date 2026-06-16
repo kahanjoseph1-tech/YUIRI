@@ -18,18 +18,20 @@ const privateKey = (
   process.env.FB_ADMIN_PRIVATE_KEY || process.env.FIREBASE_PRIVATE_KEY || ""
 ).replace(/\\n/g, "\n");
 
-if (getApps().length === 0) {
+let defaultApp = getApps().find((app) => app.name === "[DEFAULT]");
+
+if (!defaultApp) {
   if (serviceAccountBase64) {
     const serviceAccount = JSON.parse(
       Buffer.from(serviceAccountBase64, "base64").toString("utf-8")
     );
 
-    initializeApp({
+    defaultApp = initializeApp({
       credential: cert(serviceAccount),
       projectId: serviceAccount.project_id || projectId,
     });
   } else if (projectId && clientEmail && privateKey) {
-    initializeApp({
+    defaultApp = initializeApp({
       credential: cert({
         projectId,
         clientEmail,
@@ -38,12 +40,12 @@ if (getApps().length === 0) {
       projectId,
     });
   } else {
-    initializeApp({
+    defaultApp = initializeApp({
       credential: applicationDefault(),
       projectId,
     });
   }
 }
 
-export const adminDb = getFirestore();
-export const adminAuth = getAuth();
+export const adminDb = getFirestore(defaultApp);
+export const adminAuth = getAuth(defaultApp);
