@@ -4,6 +4,8 @@ import { adminDb } from "./firebase-admin";
 import bcrypt from "bcryptjs";
 import { User } from "./types";
 
+const useSecureCookies = process.env.NEXTAUTH_URL?.startsWith("https://") ?? false;
+
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
@@ -59,6 +61,17 @@ export const authOptions: NextAuthOptions = {
   },
   session: {
     strategy: "jwt",
+  },
+  cookies: {
+    sessionToken: {
+      name: useSecureCookies ? "__session" : "next-auth.session-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: useSecureCookies,
+      },
+    },
   },
   secret: process.env.NEXTAUTH_SECRET,
 };
