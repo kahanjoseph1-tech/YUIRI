@@ -15,7 +15,7 @@ interface Activity {
   id: string;
   type: string;
   description: string;
-  createdAt: string;
+  timestamp: string;
 }
 
 const summaryCards = [
@@ -165,9 +165,15 @@ export default function DashboardPage() {
                     <span className="text-sm">{activity.description}</span>
                   </div>
                   <span className="text-xs text-muted-foreground whitespace-nowrap ml-4">
-                    {formatDistanceToNow(new Date(activity.createdAt), {
-                      addSuffix: true,
-                    })}
+                    {(() => {
+                      try {
+                        const d = new Date(activity.timestamp);
+                        if (isNaN(d.getTime())) return "";
+                        return formatDistanceToNow(d, { addSuffix: true });
+                      } catch {
+                        return "";
+                      }
+                    })()}
                   </span>
                 </li>
               ))}
