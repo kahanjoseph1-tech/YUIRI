@@ -17,7 +17,17 @@ const privateKey = (
 ).replace(/\\n/g, "\n");
 
 if (getApps().length === 0) {
-  if (projectId && clientEmail && privateKey) {
+  const runningOnGoogle =
+    Boolean(process.env.K_SERVICE) ||
+    Boolean(process.env.FUNCTION_TARGET) ||
+    Boolean(process.env.FUNCTIONS_TARGET);
+
+  if (runningOnGoogle) {
+    initializeApp({
+      credential: applicationDefault(),
+      projectId,
+    });
+  } else if (projectId && clientEmail && privateKey) {
     initializeApp({
       credential: cert({
         projectId,
