@@ -15,7 +15,7 @@ import {
   isToday,
   parseISO,
 } from "date-fns";
-import { Plus, ChevronLeft, ChevronRight, Calendar, List, Search } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, Calendar, List, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -56,6 +56,12 @@ import type {
   User,
 } from "@/lib/types";
 
+// Extended appointment type that includes the name fields returned by the API
+type AppointmentWithNames = Appointment & {
+  clientName?: string;
+  evaluatorName?: string;
+};
+
 const STATUS_COLORS: Record<AppointmentStatus, string> = {
   SCHEDULED: "default",
   COMPLETED: "success",
@@ -85,7 +91,7 @@ export default function SchedulingPage() {
   const { toast } = useToast();
 
   // Data state
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [appointments, setAppointments] = useState<AppointmentWithNames[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [evaluators, setEvaluators] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -100,8 +106,12 @@ export default function SchedulingPage() {
   // Dialog state
   const [newDialogOpen, setNewDialogOpen] = useState(false);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
-  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [selectedAppointment, setSelectedAppointment] = useState<AppointmentWithNames | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Delete confirmation state
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Calendar state
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -155,7 +165,7 @@ export default function SchedulingPage() {
       const res = await fetch("/api/users");
       if (!res.ok) throw new Error("Failed to fetch users");
       const data: User[] = await res.json();
-      setEvaluators(data.filter((u) => u.role === "EVALUATOR"));
+      setEvaluators(data);
     } catch {
       // Non-blocking
     }
@@ -217,7 +227,7 @@ export default function SchedulingPage() {
   }, [currentMonth]);
 
   const appointmentsByDay = useMemo(() => {
-    const map = new Map<string, Appointment[]>();
+    const map = new Map<string, AppointmentWithNames[]>();
     appointments.forEach((a) => {
       const key = format(parseISO(a.dateTime), "yyyy-MM-dd");
       const arr = map.get(key) || [];
@@ -317,19 +327,44 @@ export default function SchedulingPage() {
     }
   }
 
-  function openDetail(appt: Appointment) {
+  // Delete appointment
+  async function handleDelete() {
+    if (!selectedAppointment) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/appointments/${selectedAppointment.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete appointment");
+      toast({ title: "Deleted", description: "Appointment has been deleted." });
+      setDeleteConfirmOpen(false);
+      setDetailDialogOpen(false);
+      setSelectedAppointment(null);
+      await fetchAppointments();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to delete appointment";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  function openDetail(appt: AppointmentWithNames) {
     setSelectedAppointment(appt);
     setEditForm({ location: appt.location || "", notes: appt.notes || "" });
+    setDeleteConfirmOpen(false);
     setDetailDialogOpen(true);
   }
 
-  function getClientName(appt: Appointment) {
+  function getClientName(appt: AppointmentWithNames) {
+    if (appt.clientName) return appt.clientName;
     if (appt.client) return `${appt.client.boyFirstName} ${appt.client.boyLastName}`;
     const c = clients.find((cl) => cl.id === appt.clientId);
     return c ? `${c.boyFirstName} ${c.boyLastName}` : "Unknown Client";
   }
 
-  function getEvaluatorName(appt: Appointment) {
+  function getEvaluatorName(appt: AppointmentWithNames) {
+    if (appt.evaluatorName) return appt.evaluatorName;
     if (appt.evaluator) return appt.evaluator.name;
     const e = evaluators.find((ev) => ev.id === appt.evaluatorId);
     return e ? e.name : "Unknown";
@@ -854,6 +889,45 @@ export default function SchedulingPage() {
                     </Button>
                   </div>
                 )}
+
+                {/* Delete section */}
+                <div className="border-t pt-4">
+                  {!deleteConfirmOpen ? (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setDeleteConfirmOpen(true)}
+                      disabled={submitting || deleting}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete Appointment
+                    </Button>
+                  ) : (
+                    <div className="rounded-md border border-destructive/50 bg-destructive/5 p-3 space-y-3">
+                      <p className="text-sm font-medium text-destructive">
+                        Are you sure you want to delete this appointment? This action cannot be undone.
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={handleDelete}
+                          disabled={deleting}
+                        >
+                          {deleting ? "Deleting..." : "Yes, Delete"}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setDeleteConfirmOpen(false)}
+                          disabled={deleting}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </>
           )}

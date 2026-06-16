@@ -3,6 +3,7 @@ import {
   getDocument,
   updateDocument,
   createDocument,
+  deleteDocument,
 } from "@/lib/db";
 import { Appointment, Client, User } from "@/lib/types";
 
@@ -93,5 +94,23 @@ export async function PUT(
       { error: "Failed to update appointment" },
       { status: 500 }
     );
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const existing = await getDocument<Appointment>("appointments", id);
+    if (!existing) {
+      return NextResponse.json({ error: "Appointment not found" }, { status: 404 });
+    }
+    await deleteDocument("appointments", id);
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting appointment:", error);
+    return NextResponse.json({ error: "Failed to delete appointment" }, { status: 500 });
   }
 }

@@ -75,14 +75,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const evaluator = await getDocument<User>("users", evaluatorId);
-    if (!evaluator || evaluator.role !== "EVALUATOR") {
-      return NextResponse.json(
-        { error: "Invalid evaluator: user must have EVALUATOR role" },
-        { status: 400 }
-      );
-    }
-
     const appointmentData = {
       clientId,
       evaluatorId,

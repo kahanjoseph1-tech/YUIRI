@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDocument, getCollection, updateDocument } from "@/lib/db";
+import { getDocument, getCollection, updateDocument, deleteDocument } from "@/lib/db";
 import { BillingRecord, Client } from "@/lib/types";
 import { generateInvoiceNumber } from "@/lib/utils";
 
@@ -87,5 +87,23 @@ export async function PUT(
       { error: "Failed to update billing record" },
       { status: 500 }
     );
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const existing = await getDocument<BillingRecord>("billing", id);
+    if (!existing) {
+      return NextResponse.json({ error: "Billing record not found" }, { status: 404 });
+    }
+    await deleteDocument("billing", id);
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting billing record:", error);
+    return NextResponse.json({ error: "Failed to delete billing record" }, { status: 500 });
   }
 }
