@@ -2,6 +2,8 @@ import { initializeApp, getApps, cert, applicationDefault } from "firebase-admin
 import { getFirestore } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 
+const serviceAccountBase64 = process.env.FB_ADMIN_SERVICE_ACCOUNT_B64;
+
 const projectId =
   process.env.FB_ADMIN_PROJECT_ID ||
   process.env.FIREBASE_PROJECT_ID ||
@@ -17,15 +19,14 @@ const privateKey = (
 ).replace(/\\n/g, "\n");
 
 if (getApps().length === 0) {
-  const runningOnGoogle =
-    Boolean(process.env.K_SERVICE) ||
-    Boolean(process.env.FUNCTION_TARGET) ||
-    Boolean(process.env.FUNCTIONS_TARGET);
+  if (serviceAccountBase64) {
+    const serviceAccount = JSON.parse(
+      Buffer.from(serviceAccountBase64, "base64").toString("utf-8")
+    );
 
-  if (runningOnGoogle) {
     initializeApp({
-      credential: applicationDefault(),
-      projectId,
+      credential: cert(serviceAccount),
+      projectId: serviceAccount.project_id || projectId,
     });
   } else if (projectId && clientEmail && privateKey) {
     initializeApp({
