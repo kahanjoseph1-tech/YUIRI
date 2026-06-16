@@ -17,15 +17,8 @@ jobs:
 
       - run: npm ci
 
-      - run: npm run build
-        env:
-          FB_ADMIN_PROJECT_ID: ${{ secrets.FB_ADMIN_PROJECT_ID }}
-          FB_ADMIN_CLIENT_EMAIL: ${{ secrets.FB_ADMIN_CLIENT_EMAIL }}
-          FB_ADMIN_PRIVATE_KEY: ${{ secrets.FB_ADMIN_PRIVATE_KEY }}
-
-      - uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          channelId: live
-          projectId: yuiri-1f4d3
+      - name: Deploy to Firebase
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa-key.json
+          export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa-key.json
+          npx firebase-tools deploy --project yuiri-1f4d3 --non-interactive --force
