@@ -22,7 +22,8 @@ const collectionNames = {
 
 const enumMaps = {
   clientStatus: {
-    NEW_LEAD: "New Lead",
+    NEW_LEAD: "New Client",
+    NEW_CLIENT: "New Client",
     INTAKE_SCHEDULED: "Intake Scheduled",
     EVALUATING: "Evaluating",
     SCHOOL_MATCH_NEEDED: "School Match Needed",
@@ -106,6 +107,28 @@ function compact(value) {
   );
 }
 
+function normalizeClientId(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  if (!digits) return "";
+  return digits.slice(-4).padStart(4, "0");
+}
+
+function normalizePhoneNumbers(data) {
+  const rawPhoneNumbers = Array.isArray(data.phone_numbers)
+    ? data.phone_numbers
+    : Array.isArray(data.phoneNumbers)
+      ? data.phoneNumbers
+      : [];
+
+  return rawPhoneNumbers
+    .map((phone) => ({
+      tag: phone?.tag || "Father's Cell",
+      custom_label: phone?.custom_label || phone?.customLabel || "",
+      number: phone?.number || phone?.phone || "",
+    }))
+    .filter((phone) => phone.number || phone.custom_label);
+}
+
 function withDates(id, data) {
   return {
     id,
@@ -147,9 +170,12 @@ function toUser(data) {
 
 function fromClient(id, data) {
   const parentNames = parentNamesFromClient(data);
+  const phoneNumbers = normalizePhoneNumbers(data);
+  const parentPhone = data.parent_phone || data.phone || phoneNumbers[0]?.number || "";
   return {
     ...data,
     ...withDates(id, data),
+    client_id: normalizeClientId(data.client_id || data.clientId),
     boy_first_name: data.boy_first_name || data.boyFirstName || "",
     boy_last_name: data.boy_last_name || data.boyLastName || "",
     age: data.age,
@@ -157,14 +183,17 @@ function fromClient(id, data) {
     father_name: data.father_name || "",
     mother_name: data.mother_name || "",
     parent_names: parentNames || "",
-    parent_phone: data.parent_phone || data.phone || "",
+    phone_numbers: phoneNumbers,
+    parent_phone: parentPhone,
     parent_email: data.parent_email || data.email || "",
     city: data.city || "",
     current_school: data.current_school || data.currentSchool || "",
     referral_source: data.referral_source || data.referralSource || "",
+    caller_source:
+      data.caller_source || data.callerSource || data.referral_source || data.referralSource || "",
     religious_level: data.religious_level || data.religiousLevel || "",
     family_expectations: data.family_expectations || data.familyExpectations || "",
-    status: normalizeEnum(data.status, "clientStatus") || "New Lead",
+    status: normalizeEnum(data.status, "clientStatus") || "New Client",
     assigned_evaluator_id:
       data.assigned_evaluator_id || data.evaluatorId || data.createdById || "",
     special_needs: data.special_needs || [],
@@ -175,19 +204,52 @@ function fromClient(id, data) {
 
 function toClient(data) {
   const parentNames = parentNamesFromClient(data);
+  const phoneNumbers = normalizePhoneNumbers(data);
+  const parentPhone = phoneNumbers[0]?.number || data.parent_phone;
   return compact({
     ...data,
+    clientId: normalizeClientId(data.client_id || data.clientId),
     boyFirstName: data.boy_first_name,
     boyLastName: data.boy_last_name,
     grade: data.grade_level,
     parentNames,
-    phone: data.parent_phone,
+    phone_numbers: phoneNumbers,
+    phoneNumbers,
+    parent_phone: parentPhone,
+    phone: parentPhone,
     email: data.parent_email,
     currentSchool: data.current_school,
     referralSource: data.referral_source,
+    callerSource: data.caller_source,
     familyExpectations: data.family_expectations,
     createdById: data.created_by_id || data.assigned_evaluator_id || data.createdById,
   });
+}
+
+async function nextFourDigitClientId(collectionName, transformer) {
+  const snapshot = await getDocs(collection(db, collectionName));
+  const used = new Set();
+  let max = 0;
+
+  snapshot.docs.forEach((document) => {
+    const row = transformer.fromDb(document.id, document.data());
+    const clientId = normalizeClientId(row.client_id || row.clientId);
+    if (!clientId) return;
+    used.add(clientId);
+    max = Math.max(max, Number(clientId));
+  });
+
+  for (let value = max + 1; value <= 9999; value += 1) {
+    const candidate = String(value).padStart(4, "0");
+    if (!used.has(candidate)) return candidate;
+  }
+
+  for (let value = 1; value <= max; value += 1) {
+    const candidate = String(value).padStart(4, "0");
+    if (!used.has(candidate)) return candidate;
+  }
+
+  throw new Error("No available 4-digit client IDs");
 }
 
 function fromAppointment(id, data) {
@@ -370,8 +432,12 @@ function createEntity(entityName) {
 
     async create(data) {
       const now = new Date().toISOString();
+      const sourceData = { ...(data || {}) };
+      if (entityName === "Client" && !normalizeClientId(sourceData.client_id || sourceData.clientId)) {
+        sourceData.client_id = await nextFourDigitClientId(collectionName, transformer);
+      }
       const payload = compact({
-        ...transformer.toDb(data || {}),
+        ...transformer.toDb(sourceData),
         createdAt: now,
         updatedAt: now,
         created_date: now,
@@ -383,8 +449,13 @@ function createEntity(entityName) {
 
     async update(id, data) {
       const now = new Date().toISOString();
+      const sourceData = { ...(data || {}) };
+      if (entityName === "Client" && !normalizeClientId(sourceData.client_id || sourceData.clientId)) {
+        const existing = await this.get(id);
+        sourceData.client_id = existing?.client_id || (await nextFourDigitClientId(collectionName, transformer));
+      }
       const payload = compact({
-        ...transformer.toDb(data || {}),
+        ...transformer.toDb(sourceData),
         updatedAt: now,
         updated_date: now,
       });

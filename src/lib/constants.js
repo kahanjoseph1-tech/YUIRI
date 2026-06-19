@@ -7,13 +7,30 @@ export const GRADE_LEVELS = [
 
 // ---- Client ----
 export const CLIENT_STATUSES = [
-  "New Lead",
+  "New Client",
   "Intake Scheduled",
   "Evaluating",
   "School Match Needed",
   "Referred",
   "Accepted",
   "Inactive",
+];
+
+export const PHONE_NUMBER_TAGS = [
+  "Father's Cell",
+  "Home Phone",
+  "Mother's Cell",
+  "Custom",
+];
+
+export const DEFAULT_CALLER_OPTIONS = [
+  "טאטע",
+  "מאמע",
+  "ביידע עלטערן",
+  "בחור",
+  "רבי / ראש ישיבה",
+  "ישיבה",
+  "אנדערע",
 ];
 
 export const REFERRAL_SOURCES = [

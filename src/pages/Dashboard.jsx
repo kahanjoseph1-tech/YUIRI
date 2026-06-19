@@ -49,7 +49,7 @@ export default function Dashboard() {
 
   const loading = l1 || l2 || l3 || l4;
 
-  const newLeads = clients.filter((c) => c.status === "New Lead").length;
+  const newClients = clients.filter((c) => c.status === "New Client" || c.status === "New Lead").length;
   const now = new Date();
   const in7 = new Date(now.getTime() + 7 * 86400000);
   const upcoming = appointments.filter((a) => {
@@ -63,7 +63,7 @@ export default function Dashboard() {
     .reduce((s, b) => s + (Number(b.amount) || 0), 0);
 
   const cards = [
-    { key: "Clients", to: `${createPageUrl("Clients")}?status=New%20Lead`, title: "New Leads", value: newLeads, icon: UserPlus, color: "blue" },
+    { key: "Clients", to: `${createPageUrl("Clients")}?status=New%20Client`, title: "New Clients", value: newClients, icon: UserPlus, color: "blue" },
     { key: "Appointments", to: createPageUrl("Appointments"), title: "Upcoming (7d)", value: upcoming, icon: CalendarClock, color: "amber" },
     { key: "Evaluations", to: createPageUrl("Evaluations"), title: "Pending Evals", value: pendingEvals, icon: ClipboardList, color: "violet" },
     { key: "Clients", to: `${createPageUrl("Clients")}?ready=1`, title: "Ready to Bill", value: readyToBill, icon: BadgeDollarSign, color: "emerald" },

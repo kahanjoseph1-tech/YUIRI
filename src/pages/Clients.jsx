@@ -18,6 +18,26 @@ import { useRole } from "@/lib/useRole";
 
 const PAGE_SIZE = 12;
 
+function normalizeStatus(value) {
+  return value === "New Lead" ? "New Client" : value;
+}
+
+function phoneLabel(phone) {
+  if (!phone) return "";
+  return phone.tag === "Custom" && phone.custom_label ? phone.custom_label : phone.tag;
+}
+
+function primaryPhone(client) {
+  const phone = Array.isArray(client.phone_numbers)
+    ? client.phone_numbers.find((item) => item.number)
+    : null;
+  if (phone?.number) {
+    const label = phoneLabel(phone);
+    return label ? `${label}: ${phone.number}` : phone.number;
+  }
+  return client.parent_phone || "";
+}
+
 export default function Clients() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -26,7 +46,7 @@ export default function Clients() {
   const queryClient = useQueryClient();
 
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState(params.get("status") || "all");
+  const [status, setStatus] = useState(normalizeStatus(params.get("status")) || "all");
   const [readyOnly] = useState(params.get("ready") === "1");
   const [sort, setSort] = useState({ key: "boy_last_name", dir: "asc" });
   const [page, setPage] = useState(1);
@@ -54,9 +74,9 @@ export default function Clients() {
 
   const filtered = useMemo(() => {
     let rows = clients.filter((c) => {
-      const name = `${c.boy_first_name || ""} ${c.boy_last_name || ""} ${c.father_name || ""} ${c.mother_name || ""}`.toLowerCase();
+      const name = `${c.client_id || ""} ${c.boy_first_name || ""} ${c.boy_last_name || ""} ${c.father_name || ""} ${c.mother_name || ""} ${c.caller_source || ""}`.toLowerCase();
       if (search && !name.includes(search.toLowerCase())) return false;
-      if (status !== "all" && c.status !== status) return false;
+      if (status !== "all" && normalizeStatus(c.status) !== status) return false;
       if (readyOnly && !c.ready_to_bill) return false;
       return true;
     });
@@ -123,8 +143,9 @@ export default function Clients() {
             <TableHeader>
               <TableRow>
                 <SortHead k="boy_last_name">Name</SortHead>
+                <SortHead k="client_id">Client ID</SortHead>
                 <SortHead k="city">City</SortHead>
-                <TableHead>Parent Phone</TableHead>
+                <TableHead>Phone number</TableHead>
                 <SortHead k="status">Status</SortHead>
               </TableRow>
             </TableHeader>
@@ -132,8 +153,9 @@ export default function Clients() {
               {pageRows.map((c) => (
                 <TableRow key={c.id} className="cursor-pointer" onClick={() => navigate(`${createPageUrl("ClientDetail")}?id=${c.id}`)}>
                   <TableCell className="font-medium text-gray-900">{c.boy_first_name} {c.boy_last_name}</TableCell>
+                  <TableCell className="text-gray-500">{c.client_id || "—"}</TableCell>
                   <TableCell className="text-gray-500">{c.city || "—"}</TableCell>
-                  <TableCell className="text-gray-500">{c.parent_phone || "—"}</TableCell>
+                  <TableCell className="text-gray-500">{primaryPhone(c) || "—"}</TableCell>
                   <TableCell><StatusBadge status={c.status} /></TableCell>
                 </TableRow>
               ))}

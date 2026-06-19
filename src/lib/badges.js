@@ -13,6 +13,7 @@ export const TONE_CLASSES = {
 const STATUS_TONE = {
   // Client
   "New Lead": "blue",
+  "New Client": "blue",
   "Intake Scheduled": "yellow",
   "Evaluating": "blue",
   "School Match Needed": "yellow",

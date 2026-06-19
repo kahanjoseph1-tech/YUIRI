@@ -24,6 +24,18 @@ function Info({ icon: Icon, label, value }) {
   );
 }
 
+function phoneLabel(phone) {
+  if (!phone) return "";
+  return phone.tag === "Custom" && phone.custom_label ? phone.custom_label : phone.tag;
+}
+
+function clientPhoneRows(client) {
+  if (Array.isArray(client.phone_numbers) && client.phone_numbers.some((phone) => phone.number)) {
+    return client.phone_numbers.filter((phone) => phone.number);
+  }
+  return client.parent_phone ? [{ tag: "Phone", number: client.parent_phone }] : [];
+}
+
 export default function ClientDetail() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
@@ -109,7 +121,8 @@ export default function ClientDetail() {
               <StatusBadge status={client.status} />
             </div>
             <p className="text-sm text-gray-400 mt-1">
-              {client.age ? `Age ${client.age}` : ""}{client.age && client.grade_level ? " · " : ""}{client.grade_level || ""}
+              {client.client_id ? `ID ${client.client_id}` : ""}{client.client_id && client.age ? " · " : ""}
+              {client.age ? `ווי אלט ${client.age}` : ""}{client.age && client.grade_level ? " · " : ""}{client.grade_level || ""}
               {client.religious_level ? ` · ${client.religious_level}` : ""}
             </p>
           </div>
@@ -133,11 +146,15 @@ export default function ClientDetail() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2 mt-5 pt-5 border-t border-gray-50">
-          <Info icon={Phone} label="Phone" value={client.parent_phone} />
-          <Info icon={Mail} label="Email" value={client.parent_email} />
+          <Info icon={Phone} label="Client ID" value={client.client_id} />
+          {clientPhoneRows(client).map((phone, index) => (
+            <Info key={index} icon={Phone} label={phoneLabel(phone) || "Phone"} value={phone.number} />
+          ))}
+          <Info icon={Mail} label="Email address" value={client.parent_email} />
           <Info icon={MapPin} label="City" value={client.city} />
-          <Info icon={GraduationCap} label="Current School" value={client.current_school} />
-          <Info icon={Phone} label="Father" value={client.father_name} />
+          <Info icon={GraduationCap} label="לערנט בישיבה" value={client.current_school} />
+          <Info icon={Phone} label="טאטע'ס נאמען" value={client.father_name} />
+          <Info icon={Phone} label="ווער רופט" value={client.caller_source || client.referral_source} />
           <Info icon={Phone} label="Mother" value={client.mother_name} />
         </div>
 
