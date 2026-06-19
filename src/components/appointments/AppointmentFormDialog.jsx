@@ -290,7 +290,7 @@ export default function AppointmentFormDialog({
             </div>
             {form.payment_method === "Credit Card" && (
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-gray-500">Card last 4</Label>
+                <Label className="text-xs font-medium text-gray-500">Card last 4 only</Label>
                 <Input
                   inputMode="numeric"
                   maxLength={4}
@@ -298,6 +298,7 @@ export default function AppointmentFormDialog({
                   onChange={(e) => update("card_last4", e.target.value.replace(/\D/g, "").slice(0, 4))}
                   placeholder="1234"
                 />
+                <p className="text-xs text-gray-400">Do not enter full card numbers or CVV here.</p>
               </div>
             )}
             <div className="space-y-1.5">

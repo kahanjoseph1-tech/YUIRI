@@ -284,6 +284,7 @@ function fromEvaluation(id, data) {
   return {
     ...withDates(id, data),
     appointment_id: data.appointment_id || "",
+    appointment_date: toIso(data.appointment_date),
     client_id: data.client_id || "",
     evaluator_id: data.evaluator_id || "",
     client_name: data.client_name || "",
@@ -305,6 +306,7 @@ function fromEvaluation(id, data) {
 function toEvaluation(data) {
   return compact({
     appointment_id: data.appointment_id,
+    appointment_date: data.appointment_date,
     client_id: data.client_id,
     evaluator_id: data.evaluator_id,
     client_name: data.client_name,

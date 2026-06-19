@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { firebaseClient } from "@/api/firebaseClient";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import {
@@ -10,6 +10,7 @@ import { useRole } from "@/lib/useRole";
 import { fmtCurrency, fmtDateTime, toDate } from "@/lib/format";
 import { Skeleton } from "@/components/ui/skeleton";
 import ClientQuickProfileDialog from "@/components/clients/ClientQuickProfileDialog";
+import { syncDueEvaluationAppointments } from "@/lib/automations";
 
 function StatCard({ to, title, value, icon: Icon, color }) {
   const colors = {
@@ -33,8 +34,10 @@ function StatCard({ to, title, value, icon: Icon, color }) {
 }
 
 export default function Dashboard() {
+  const queryClient = useQueryClient();
   const { canAccessPage } = useRole();
   const [profileClient, setProfileClient] = useState(null);
+  const lastSyncKeyRef = useRef("");
 
   const { data: clients = [], isLoading: l1 } = useQuery({
     queryKey: ["clients"], queryFn: () => firebaseClient.entities.Client.list("-created_date", 500),
@@ -54,6 +57,31 @@ export default function Dashboard() {
   });
 
   const loading = l1 || l2 || l3 || l4;
+
+  const dueSyncKey = useMemo(
+    () => appointments
+      .filter((appointment) => (appointment.meeting_type || "Evaluation") === "Evaluation")
+      .map((appointment) => `${appointment.id}:${appointment.date_time}:${appointment.status}`)
+      .join("|"),
+    [appointments]
+  );
+
+  useEffect(() => {
+    if (l2 || !dueSyncKey || lastSyncKeyRef.current === dueSyncKey) return;
+    lastSyncKeyRef.current = dueSyncKey;
+
+    syncDueEvaluationAppointments(appointments)
+      .then((syncedCount) => {
+        if (syncedCount > 0) {
+          queryClient.invalidateQueries({ queryKey: ["evaluations"] });
+          queryClient.invalidateQueries({ queryKey: ["clients"] });
+          queryClient.invalidateQueries({ queryKey: ["billing"] });
+        }
+      })
+      .catch((error) => {
+        console.error("Due evaluation sync failed:", error);
+      });
+  }, [appointments, dueSyncKey, l2, queryClient]);
 
   const newClients = clients.filter((c) => c.status === "New Client").length;
   const now = new Date();

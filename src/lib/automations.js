@@ -59,10 +59,23 @@ export async function ensureEvaluationBillingForAppointment(appointment) {
   });
 }
 
-// 1. Appointment -> "Completed": create a Pending Evaluation (once) and move
-//    the client to "Evaluating".
-export async function onAppointmentCompleted(appointment) {
-  if (!appointment) return;
+function localDateKey(value) {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) return "";
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function isDueEvaluationAppointment(appointment, todayKey = localDateKey(new Date())) {
+  if (!appointment || (appointment.meeting_type || "Evaluation") !== "Evaluation") return false;
+  if (["Cancelled", "No Show"].includes(appointment.status)) return false;
+  const appointmentDateKey = localDateKey(appointment.date_time);
+  return appointmentDateKey && appointmentDateKey <= todayKey;
+}
+
+export async function ensureEvaluationForAppointment(appointment) {
+  if (!appointment) return false;
 
   let alreadyHasEval = false;
   try {
@@ -72,6 +85,7 @@ export async function onAppointmentCompleted(appointment) {
     alreadyHasEval = false;
   }
 
+  let created = false;
   if (!alreadyHasEval) {
     await firebaseClient.entities.Evaluation.create({
       appointment_id: appointment.id,
@@ -79,13 +93,38 @@ export async function onAppointmentCompleted(appointment) {
       client_name: appointment.client_name,
       evaluator_id: appointment.evaluator_id,
       evaluator_name: appointment.evaluator_name,
+      appointment_date: appointment.date_time,
       status: "Pending",
     });
+    created = true;
   }
 
   if (appointment.client_id) {
     await firebaseClient.entities.Client.update(appointment.client_id, { status: "Evaluating" });
   }
+
+  return created;
+}
+
+export async function syncDueEvaluationAppointments(appointments = []) {
+  const todayKey = localDateKey(new Date());
+  const dueAppointments = appointments.filter((appointment) => isDueEvaluationAppointment(appointment, todayKey));
+
+  if (dueAppointments.length === 0) return 0;
+
+  let createdOrSynced = 0;
+  for (const appointment of dueAppointments) {
+    const created = await ensureEvaluationForAppointment(appointment);
+    await ensureEvaluationBillingForAppointment(appointment);
+    if (created) createdOrSynced += 1;
+  }
+  return createdOrSynced;
+}
+
+// 1. Appointment -> "Completed": create a Pending Evaluation (once) and move
+//    the client to "Evaluating".
+export async function onAppointmentCompleted(appointment) {
+  await ensureEvaluationForAppointment(appointment);
 }
 
 // 2. Evaluation -> "Completed": flag the client for school matching + billing,

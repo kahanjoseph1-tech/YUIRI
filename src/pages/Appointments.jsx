@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { firebaseClient } from "@/api/firebaseClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -12,7 +12,7 @@ import AppointmentCalendar from "@/components/appointments/AppointmentCalendar";
 import AvailabilityDialog from "@/components/appointments/AvailabilityDialog";
 import DayScheduleDialog from "@/components/appointments/DayScheduleDialog";
 import { APPOINTMENT_STATUSES } from "@/lib/constants";
-import { ensureEvaluationBillingForAppointment, onAppointmentCompleted } from "@/lib/automations";
+import { ensureEvaluationBillingForAppointment, onAppointmentCompleted, syncDueEvaluationAppointments } from "@/lib/automations";
 import { can } from "@/lib/roles";
 import { useRole } from "@/lib/useRole";
 import { fmtDateTime } from "@/lib/format";
@@ -41,6 +41,7 @@ export default function Appointments() {
   const [editAppt, setEditAppt] = useState(null);
   const [selectedDay, setSelectedDay] = useState(null);
   const [appointmentDefaults, setAppointmentDefaults] = useState(null);
+  const lastSyncKeyRef = useRef("");
 
   const { data: appointments = [], isLoading } = useQuery({
     queryKey: ["appointments"], queryFn: () => firebaseClient.entities.Appointment.list("-date_time", 1000),
@@ -52,6 +53,31 @@ export default function Appointments() {
     queryKey: ["appointment-availability"],
     queryFn: () => firebaseClient.entities.AppointmentAvailability.list("day_of_week", 500),
   });
+
+  const dueSyncKey = useMemo(
+    () => appointments
+      .filter((appointment) => (appointment.meeting_type || "Evaluation") === "Evaluation")
+      .map((appointment) => `${appointment.id}:${appointment.date_time}:${appointment.status}`)
+      .join("|"),
+    [appointments]
+  );
+
+  useEffect(() => {
+    if (isLoading || !dueSyncKey || lastSyncKeyRef.current === dueSyncKey) return;
+    lastSyncKeyRef.current = dueSyncKey;
+
+    syncDueEvaluationAppointments(appointments)
+      .then((syncedCount) => {
+        if (syncedCount > 0) {
+          queryClient.invalidateQueries({ queryKey: ["evaluations"] });
+          queryClient.invalidateQueries({ queryKey: ["clients"] });
+          queryClient.invalidateQueries({ queryKey: ["billing"] });
+        }
+      })
+      .catch((error) => {
+        console.error("Due evaluation sync failed:", error);
+      });
+  }, [appointments, dueSyncKey, isLoading, queryClient]);
 
   const createMutation = useMutation({
     mutationFn: async (data) => {

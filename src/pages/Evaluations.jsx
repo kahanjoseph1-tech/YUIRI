@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { firebaseClient } from "@/api/firebaseClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -9,18 +9,64 @@ import { ClipboardList } from "lucide-react";
 import StatusBadge from "@/components/StatusBadge";
 import EvaluationFormDialog from "@/components/evaluations/EvaluationFormDialog";
 import { EVALUATION_STATUSES } from "@/lib/constants";
-import { onEvaluationCompleted } from "@/lib/automations";
-import { fmtDate } from "@/lib/format";
+import { onEvaluationCompleted, syncDueEvaluationAppointments } from "@/lib/automations";
+import { fmtDate, fmtDateTime } from "@/lib/format";
+
+function localDateKey(value) {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) return "";
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function dueLabel(value) {
+  const appointmentKey = localDateKey(value);
+  if (!appointmentKey) return "";
+  const todayKey = localDateKey(new Date());
+  if (appointmentKey === todayKey) return "Today";
+  if (appointmentKey < todayKey) return "Overdue";
+  return "Upcoming";
+}
 
 export default function Evaluations() {
   const queryClient = useQueryClient();
 
   const [statusFilter, setStatusFilter] = useState("open");
   const [active, setActive] = useState(null);
+  const lastSyncKeyRef = useRef("");
 
   const { data: evaluations = [], isLoading } = useQuery({
     queryKey: ["evaluations"], queryFn: () => firebaseClient.entities.Evaluation.list("-created_date", 1000),
   });
+  const { data: appointments = [], isLoading: appointmentsLoading } = useQuery({
+    queryKey: ["appointments"], queryFn: () => firebaseClient.entities.Appointment.list("-date_time", 1000),
+  });
+
+  const dueSyncKey = useMemo(
+    () => appointments
+      .filter((appointment) => (appointment.meeting_type || "Evaluation") === "Evaluation")
+      .map((appointment) => `${appointment.id}:${appointment.date_time}:${appointment.status}`)
+      .join("|"),
+    [appointments]
+  );
+
+  useEffect(() => {
+    if (appointmentsLoading || !dueSyncKey || lastSyncKeyRef.current === dueSyncKey) return;
+    lastSyncKeyRef.current = dueSyncKey;
+
+    syncDueEvaluationAppointments(appointments)
+      .then((syncedCount) => {
+        if (syncedCount > 0) {
+          queryClient.invalidateQueries({ queryKey: ["evaluations"] });
+          queryClient.invalidateQueries({ queryKey: ["clients"] });
+          queryClient.invalidateQueries({ queryKey: ["billing"] });
+        }
+      })
+      .catch((error) => {
+        console.error("Due evaluation sync failed:", error);
+      });
+  }, [appointments, appointmentsLoading, dueSyncKey, queryClient]);
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data, nextStatus, prev }) => {
@@ -80,6 +126,7 @@ export default function Evaluations() {
                 <TableHead>Client</TableHead>
                 <TableHead>Evaluator</TableHead>
                 <TableHead>Urgency</TableHead>
+                <TableHead>Appointment</TableHead>
                 <TableHead>Created</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
@@ -90,6 +137,16 @@ export default function Evaluations() {
                   <TableCell className="font-medium text-gray-900">{e.client_name || "—"}</TableCell>
                   <TableCell className="text-gray-500">{e.evaluator_name || "—"}</TableCell>
                   <TableCell>{e.urgency ? <StatusBadge status={e.urgency} /> : <span className="text-gray-400">—</span>}</TableCell>
+                  <TableCell className="text-gray-500">
+                    <div className="flex flex-col gap-1">
+                      <span>{fmtDateTime(e.appointment_date)}</span>
+                      {dueLabel(e.appointment_date) && (
+                        <span className="w-fit rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">
+                          {dueLabel(e.appointment_date)}
+                        </span>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell className="text-gray-500">{fmtDate(e.created_date)}</TableCell>
                   <TableCell><StatusBadge status={e.status} /></TableCell>
                 </TableRow>
