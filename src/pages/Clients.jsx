@@ -74,7 +74,7 @@ export default function Clients() {
 
   const filtered = useMemo(() => {
     let rows = clients.filter((c) => {
-      const name = `${c.client_id || ""} ${c.boy_first_name || ""} ${c.boy_last_name || ""} ${c.father_name || ""} ${c.mother_name || ""} ${c.caller_source || ""}`.toLowerCase();
+      const name = `${c.client_id || ""} ${c.boy_first_name || ""} ${c.boy_last_name || ""} ${c.father_name || ""} ${c.mother_name || ""} ${c.caller_source || ""} ${c.responsible_person || ""}`.toLowerCase();
       if (search && !name.includes(search.toLowerCase())) return false;
       if (status !== "all" && normalizeStatus(c.status) !== status) return false;
       if (readyOnly && !c.ready_to_bill) return false;

@@ -6,14 +6,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CLIENT_STATUSES, DEFAULT_CALLER_OPTIONS, PHONE_NUMBER_TAGS } from "@/lib/constants";
+import {
+  CLIENT_STATUSES,
+  DEFAULT_CALLER_OPTIONS,
+  DEFAULT_RESPONSIBLE_OPTIONS,
+  PHONE_NUMBER_TAGS,
+} from "@/lib/constants";
 
 const CALLER_OPTIONS_KEY = "yuiri_caller_options_v1";
+const RESPONSIBLE_OPTIONS_KEY = "yuiri_responsible_options_v1";
 
 const EMPTY = {
   boy_first_name: "", boy_last_name: "", age: "",
   father_name: "", parent_phone: "", parent_email: "",
   city: "", current_school: "", caller_source: "", referral_source: "",
+  responsible_person: "",
   family_expectations: "", notes: "", status: "New Client",
   assigned_evaluator_id: "", special_needs: [],
 };
@@ -29,8 +36,21 @@ function readCallerOptions() {
   }
 }
 
+function readResponsibleOptions() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(RESPONSIBLE_OPTIONS_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
+
 function saveCallerOptions(options) {
   localStorage.setItem(CALLER_OPTIONS_KEY, JSON.stringify(options));
+}
+
+function saveResponsibleOptions(options) {
+  localStorage.setItem(RESPONSIBLE_OPTIONS_KEY, JSON.stringify(options));
 }
 
 function uniqueOptions(options) {
@@ -67,28 +87,43 @@ export default function ClientFormDrawer({ open, onOpenChange, client, evaluator
   const [phoneRows, setPhoneRows] = useState([emptyPhoneRow()]);
   const [needsText, setNeedsText] = useState("");
   const [customCallerOptions, setCustomCallerOptions] = useState(readCallerOptions);
+  const [customResponsibleOptions, setCustomResponsibleOptions] = useState(readResponsibleOptions);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
+      const assignedEvaluator = evaluators.find((u) => u.id === client?.assigned_evaluator_id);
+      const assignedEvaluatorName = assignedEvaluator ? (assignedEvaluator.full_name || assignedEvaluator.email) : "";
       const nextForm = client
         ? {
             ...EMPTY,
             ...client,
             status: client.status === "New Lead" ? "New Client" : client.status || "New Client",
             caller_source: client.caller_source || client.referral_source || "",
+            responsible_person: client.responsible_person || assignedEvaluatorName || "",
           }
         : EMPTY;
       setForm(nextForm);
       setPhoneRows(phoneRowsFromClient(client));
       setNeedsText((client?.special_needs || []).join(", "));
     }
-  }, [open, client]);
+  }, [open, client, evaluators]);
 
   const callerOptions = useMemo(
     () => uniqueOptions([...DEFAULT_CALLER_OPTIONS, ...customCallerOptions, form.caller_source]),
     [customCallerOptions, form.caller_source]
   );
+
+  const responsibleOptions = useMemo(() => {
+    const evaluatorNames = evaluators.map((u) => u.full_name || u.email).filter(Boolean);
+    return uniqueOptions([
+      ...DEFAULT_RESPONSIBLE_OPTIONS,
+      form.father_name,
+      ...evaluatorNames,
+      ...customResponsibleOptions,
+      form.responsible_person,
+    ]);
+  }, [customResponsibleOptions, evaluators, form.father_name, form.responsible_person]);
 
   const update = (field, value) => setForm((p) => ({ ...p, [field]: value }));
 
@@ -116,6 +151,17 @@ export default function ClientFormDrawer({ open, onOpenChange, client, evaluator
     update("caller_source", cleanedValue);
   };
 
+  const addResponsibleOption = () => {
+    const value = window.prompt("Add responsible name");
+    const cleanedValue = String(value || "").trim();
+    if (!cleanedValue) return;
+
+    const nextOptions = uniqueOptions([...customResponsibleOptions, cleanedValue]);
+    setCustomResponsibleOptions(nextOptions);
+    saveResponsibleOptions(nextOptions);
+    update("responsible_person", cleanedValue);
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -127,6 +173,8 @@ export default function ClientFormDrawer({ open, onOpenChange, client, evaluator
         }))
         .filter((phone) => phone.number);
       const callerSource = form.caller_source || form.referral_source || "";
+      const responsiblePerson = form.responsible_person || "";
+      const assignedEvaluator = evaluators.find((u) => (u.full_name || u.email) === responsiblePerson);
 
       await onSave({
         ...form,
@@ -136,6 +184,8 @@ export default function ClientFormDrawer({ open, onOpenChange, client, evaluator
         parent_phone: cleanedPhones[0]?.number || "",
         caller_source: callerSource,
         referral_source: callerSource,
+        responsible_person: responsiblePerson,
+        assigned_evaluator_id: assignedEvaluator?.id || "",
         special_needs: needsText ? needsText.split(",").map((s) => s.trim()).filter(Boolean) : [],
       });
       onOpenChange(false);
@@ -257,16 +307,22 @@ export default function ClientFormDrawer({ open, onOpenChange, client, evaluator
               <SelectContent>{CLIENT_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
             </Select>
           </Field>
-          <Field label="Assigned Evaluator">
-            <Select value={form.assigned_evaluator_id || "none"} onValueChange={(v) => update("assigned_evaluator_id", v === "none" ? "" : v)}>
-              <SelectTrigger><SelectValue placeholder="Unassigned" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Unassigned</SelectItem>
-                {evaluators.map((u) => (
-                  <SelectItem key={u.id} value={u.id}>{u.full_name || u.email}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <Field label="Responsible">
+            <div className="flex gap-2">
+              <Select
+                value={form.responsible_person || "none"}
+                onValueChange={(v) => update("responsible_person", v === "none" ? "" : v)}
+              >
+                <SelectTrigger><SelectValue placeholder="Unassigned" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Unassigned</SelectItem>
+                  {responsibleOptions.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Button type="button" variant="outline" size="icon" className="h-10 w-10 shrink-0" onClick={addResponsibleOption}>
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
           </Field>
           <Field label="Special Needs (comma separated)" full>
             <Input value={needsText} onChange={(e) => setNeedsText(e.target.value)} placeholder="ADHD, Speech, Dyslexia..." />

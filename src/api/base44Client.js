@@ -191,6 +191,7 @@ function fromClient(id, data) {
     referral_source: data.referral_source || data.referralSource || "",
     caller_source:
       data.caller_source || data.callerSource || data.referral_source || data.referralSource || "",
+    responsible_person: data.responsible_person || data.responsiblePerson || "",
     religious_level: data.religious_level || data.religiousLevel || "",
     family_expectations: data.family_expectations || data.familyExpectations || "",
     status: normalizeEnum(data.status, "clientStatus") || "New Client",
@@ -221,6 +222,7 @@ function toClient(data) {
     currentSchool: data.current_school,
     referralSource: data.referral_source,
     callerSource: data.caller_source,
+    responsiblePerson: data.responsible_person,
     familyExpectations: data.family_expectations,
     createdById: data.created_by_id || data.assigned_evaluator_id || data.createdById,
   });

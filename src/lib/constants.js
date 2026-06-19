@@ -33,6 +33,16 @@ export const DEFAULT_CALLER_OPTIONS = [
   "אנדערע",
 ];
 
+export const DEFAULT_RESPONSIBLE_OPTIONS = [
+  "Father",
+  "Mother",
+  "Parents",
+  "Boy",
+  "Rabbi",
+  "School",
+  "Other",
+];
+
 export const REFERRAL_SOURCES = [
   "Word of Mouth",
   "Rabbi/Rav",
