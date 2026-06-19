@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Plus, Trash2 } from "lucide-react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,16 +11,14 @@ import {
   DEFAULT_DROPDOWN_OPTIONS,
   DROPDOWN_OPTIONS_QUERY_KEY,
   getDropdownOptions,
-  saveDropdownOptions,
   uniqueOptions,
 } from "@/lib/dropdownSettings";
-import { useRole } from "@/lib/useRole";
 
 const EMPTY = {
   boy_first_name: "", boy_last_name: "", age: "",
   father_name: "", parent_phone: "", parent_email: "",
-  city: "", current_school: "", shiur: "", reason: "", caller_source: "", referral_source: "",
-  responsible_person: "",
+  city: "", current_school: "", shiur: "", reason: "", caller_source: "", caller_name: "", referral_source: "",
+  responsible_person: "", responsible_name: "",
   family_expectations: "", notes: "", status: "New Client",
   assigned_evaluator_id: "", special_needs: [],
 };
@@ -53,14 +50,10 @@ function Field({ label, children, full }) {
   );
 }
 
-export default function ClientFormDrawer({ open, onOpenChange, client, evaluators = [], onSave }) {
-  const queryClient = useQueryClient();
-  const { isAdmin } = useRole();
+export default function ClientFormDrawer({ open, onOpenChange, client, onSave }) {
   const [form, setForm] = useState(EMPTY);
   const [phoneRows, setPhoneRows] = useState([emptyPhoneRow()]);
   const [needsText, setNeedsText] = useState("");
-  const [callerNameDraft, setCallerNameDraft] = useState("");
-  const [responsibleNameDraft, setResponsibleNameDraft] = useState("");
   const [saving, setSaving] = useState(false);
 
   const { data: dropdownOptions = DEFAULT_DROPDOWN_OPTIONS } = useQuery({
@@ -68,35 +61,22 @@ export default function ClientFormDrawer({ open, onOpenChange, client, evaluator
     queryFn: getDropdownOptions,
   });
 
-  const saveOptionsMutation = useMutation({
-    mutationFn: saveDropdownOptions,
-    onSuccess: (saved) => {
-      queryClient.setQueryData(DROPDOWN_OPTIONS_QUERY_KEY, saved);
-    },
-    onError: (error) => {
-      console.error("Failed to save dropdown option:", error);
-      toast.error("Failed to add name");
-    },
-  });
-
   useEffect(() => {
     if (open) {
-      const assignedEvaluator = evaluators.find((u) => u.id === client?.assigned_evaluator_id);
-      const assignedEvaluatorName = assignedEvaluator ? (assignedEvaluator.full_name || assignedEvaluator.email) : "";
       const nextForm = client
         ? {
             ...EMPTY,
             ...client,
             status: client.status || "New Client",
             caller_source: client.caller_source || client.referral_source || "",
-            responsible_person: client.responsible_person || assignedEvaluatorName || "",
+            responsible_person: client.responsible_person || "",
           }
         : EMPTY;
       setForm(nextForm);
       setPhoneRows(phoneRowsFromClient(client));
       setNeedsText((client?.special_needs || []).join(", "));
     }
-  }, [open, client, evaluators]);
+  }, [open, client]);
 
   const callerOptions = useMemo(
     () => uniqueOptions([...(dropdownOptions.caller_options || []), form.caller_source]),
@@ -106,10 +86,9 @@ export default function ClientFormDrawer({ open, onOpenChange, client, evaluator
   const responsibleOptions = useMemo(() => {
     return uniqueOptions([
       ...(dropdownOptions.responsible_options || []),
-      form.father_name,
       form.responsible_person,
     ]);
-  }, [dropdownOptions.responsible_options, form.father_name, form.responsible_person]);
+  }, [dropdownOptions.responsible_options, form.responsible_person]);
 
   const statusOptions = useMemo(
     () => uniqueOptions([...(dropdownOptions.client_statuses || []), form.status]),
@@ -132,25 +111,6 @@ export default function ClientFormDrawer({ open, onOpenChange, client, evaluator
   );
 
   const update = (field, value) => setForm((p) => ({ ...p, [field]: value }));
-
-  const addDropdownName = (key, value, field, clearDraft) => {
-    const cleanedValue = String(value || "").trim();
-    if (!cleanedValue) return;
-
-    saveOptionsMutation.mutate(
-      {
-        ...dropdownOptions,
-        [key]: uniqueOptions([...(dropdownOptions[key] || []), cleanedValue]),
-      },
-      {
-        onSuccess: () => {
-          update(field, cleanedValue);
-          clearDraft("");
-          toast.success("Name added");
-        },
-      }
-    );
-  };
 
   const updatePhoneRow = (index, field, value) => {
     setPhoneRows((rows) =>
@@ -177,7 +137,6 @@ export default function ClientFormDrawer({ open, onOpenChange, client, evaluator
         .filter((phone) => phone.number);
       const callerSource = form.caller_source || form.referral_source || "";
       const responsiblePerson = form.responsible_person || "";
-      const assignedEvaluator = evaluators.find((u) => (u.full_name || u.email) === responsiblePerson);
 
       await onSave({
         ...form,
@@ -186,9 +145,11 @@ export default function ClientFormDrawer({ open, onOpenChange, client, evaluator
         phone_numbers: cleanedPhones,
         parent_phone: cleanedPhones[0]?.number || "",
         caller_source: callerSource,
+        caller_name: String(form.caller_name || "").trim(),
         referral_source: callerSource,
         responsible_person: responsiblePerson,
-        assigned_evaluator_id: assignedEvaluator?.id || "",
+        responsible_name: String(form.responsible_name || "").trim(),
+        assigned_evaluator_id: form.assigned_evaluator_id || "",
         special_needs: needsText ? needsText.split(",").map((s) => s.trim()).filter(Boolean) : [],
       });
       onOpenChange(false);
@@ -313,32 +274,11 @@ export default function ClientFormDrawer({ open, onOpenChange, client, evaluator
                   {callerOptions.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
                 </SelectContent>
               </Select>
-              {isAdmin && (
-                <div className="flex gap-2">
-                  <Input
-                    value={callerNameDraft}
-                    onChange={(event) => setCallerNameDraft(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        addDropdownName("caller_options", callerNameDraft, "caller_source", setCallerNameDraft);
-                      }
-                    }}
-                    placeholder="Add name"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="h-10 w-10 shrink-0"
-                    onClick={() => addDropdownName("caller_options", callerNameDraft, "caller_source", setCallerNameDraft)}
-                    disabled={saveOptionsMutation.isPending}
-                    aria-label="Add caller name"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
+              <Input
+                value={form.caller_name || ""}
+                onChange={(event) => update("caller_name", event.target.value)}
+                placeholder="Name for this client"
+              />
             </div>
           </Field>
           <Field label="סיבה">
@@ -371,32 +311,11 @@ export default function ClientFormDrawer({ open, onOpenChange, client, evaluator
                   {responsibleOptions.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
                 </SelectContent>
               </Select>
-              {isAdmin && (
-                <div className="flex gap-2">
-                  <Input
-                    value={responsibleNameDraft}
-                    onChange={(event) => setResponsibleNameDraft(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        addDropdownName("responsible_options", responsibleNameDraft, "responsible_person", setResponsibleNameDraft);
-                      }
-                    }}
-                    placeholder="Add name"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="h-10 w-10 shrink-0"
-                    onClick={() => addDropdownName("responsible_options", responsibleNameDraft, "responsible_person", setResponsibleNameDraft)}
-                    disabled={saveOptionsMutation.isPending}
-                    aria-label="Add responsible name"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
+              <Input
+                value={form.responsible_name || ""}
+                onChange={(event) => update("responsible_name", event.target.value)}
+                placeholder="Name for this client"
+              />
             </div>
           </Field>
           <Field label="Special Needs (comma separated)" full>

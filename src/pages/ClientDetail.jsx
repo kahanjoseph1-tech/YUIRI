@@ -29,6 +29,13 @@ function phoneLabel(phone) {
   return phone.tag === "Custom" && phone.custom_label ? phone.custom_label : phone.tag;
 }
 
+function labelWithName(label, name) {
+  if (!label && !name) return "";
+  if (!name) return label;
+  if (!label) return name;
+  return `${label} - ${name}`;
+}
+
 function clientPhoneRows(client) {
   if (Array.isArray(client.phone_numbers) && client.phone_numbers.some((phone) => phone.number)) {
     return client.phone_numbers.filter((phone) => phone.number);
@@ -155,9 +162,9 @@ export default function ClientDetail() {
           <Info icon={GraduationCap} label="לערנט בישיבה" value={client.current_school} />
           <Info icon={GraduationCap} label="שיעור" value={client.shiur} />
           <Info icon={Phone} label="טאטע'ס נאמען" value={client.father_name} />
-          <Info icon={Phone} label="ווער רופט" value={client.caller_source || client.referral_source} />
+          <Info icon={Phone} label="ווער רופט" value={labelWithName(client.caller_source || client.referral_source, client.caller_name)} />
           <Info icon={FileText} label="סיבה" value={client.reason} />
-          <Info icon={Phone} label="Responsible" value={client.responsible_person} />
+          <Info icon={Phone} label="Responsible" value={labelWithName(client.responsible_person, client.responsible_name)} />
           <Info icon={Phone} label="Mother" value={client.mother_name} />
         </div>
 

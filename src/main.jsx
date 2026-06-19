@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client'
 import App from '@/App.jsx'
 import '@/index.css'
 
-const buildVersion = 'sectioned-settings-2026-06-19-1'
+const buildVersion = 'per-client-names-2026-06-19-1'
 
 window.__YUIRI_BUILD_VERSION__ = buildVersion
 
