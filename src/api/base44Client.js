@@ -11,14 +11,14 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth as firebaseAuth, db } from "@/lib/firebase";
 
 const collectionNames = {
-  User: "users",
-  Client: "clients",
-  Appointment: "appointments",
-  AppointmentAvailability: "appointment_availability",
-  Evaluation: "evaluations",
-  BillingRecord: "billing",
-  School: "schools",
-  Placement: "placements",
+  User: ["users", "User"],
+  Client: ["clients", "Client", "Student", "students"],
+  Appointment: ["appointments", "Appointment", "Consultation", "consultations"],
+  AppointmentAvailability: ["appointment_availability", "AppointmentAvailability"],
+  Evaluation: ["evaluations", "Evaluation"],
+  BillingRecord: ["billing", "billingRecords", "BillingRecord", "Payment", "payments"],
+  School: ["schools", "School"],
+  Placement: ["placements", "Placement"],
 };
 
 const enumMaps = {
@@ -142,6 +142,8 @@ function parentNamesFromClient(data) {
   return (
     data.parent_names ||
     data.parentNames ||
+    data.parent_name ||
+    data.parentName ||
     [data.father_name, data.mother_name].filter(Boolean).join(" & ")
   );
 }
@@ -172,21 +174,21 @@ function toUser(data) {
 function fromClient(id, data) {
   const parentNames = parentNamesFromClient(data);
   const phoneNumbers = normalizePhoneNumbers(data);
-  const parentPhone = data.parent_phone || data.phone || phoneNumbers[0]?.number || "";
+  const parentPhone = data.parent_phone || data.parentPhone || data.phone || phoneNumbers[0]?.number || "";
   return {
     ...data,
     ...withDates(id, data),
     client_id: normalizeClientId(data.client_id || data.clientId),
-    boy_first_name: data.boy_first_name || data.boyFirstName || "",
-    boy_last_name: data.boy_last_name || data.boyLastName || "",
+    boy_first_name: data.boy_first_name || data.boyFirstName || data.first_name || data.firstName || "",
+    boy_last_name: data.boy_last_name || data.boyLastName || data.last_name || data.lastName || "",
     age: data.age,
     grade_level: data.grade_level || data.grade || "",
-    father_name: data.father_name || "",
+    father_name: data.father_name || data.parent_name || data.parentName || "",
     mother_name: data.mother_name || "",
     parent_names: parentNames || "",
     phone_numbers: phoneNumbers,
     parent_phone: parentPhone,
-    parent_email: data.parent_email || data.email || "",
+    parent_email: data.parent_email || data.parentEmail || data.email || "",
     city: data.city || "",
     current_school: data.current_school || data.currentSchool || "",
     referral_source: data.referral_source || data.referralSource || "",
@@ -229,17 +231,21 @@ function toClient(data) {
   });
 }
 
-async function nextFourDigitClientId(collectionName, transformer) {
-  const snapshot = await getDocs(collection(db, collectionName));
+async function nextFourDigitClientId(entityName, transformer) {
+  const snapshots = await Promise.all(
+    collectionAliases(entityName).map((collectionName) => getDocs(collection(db, collectionName)))
+  );
   const used = new Set();
   let max = 0;
 
-  snapshot.docs.forEach((document) => {
-    const row = transformer.fromDb(document.id, document.data());
-    const clientId = normalizeClientId(row.client_id || row.clientId);
-    if (!clientId) return;
-    used.add(clientId);
-    max = Math.max(max, Number(clientId));
+  snapshots.forEach((snapshot) => {
+    snapshot.docs.forEach((document) => {
+      const row = transformer.fromDb(document.id, document.data());
+      const clientId = normalizeClientId(row.client_id || row.clientId);
+      if (!clientId) return;
+      used.add(clientId);
+      max = Math.max(max, Number(clientId));
+    });
   });
 
   for (let value = max + 1; value <= 9999; value += 1) {
@@ -259,10 +265,10 @@ function fromAppointment(id, data) {
   return {
     ...data,
     ...withDates(id, data),
-    client_id: data.client_id || data.clientId || "",
+    client_id: data.client_id || data.clientId || data.student_id || data.studentId || "",
     evaluator_id: data.evaluator_id || data.evaluatorId || "",
-    date_time: toIso(data.date_time || data.dateTime),
-    meeting_type: normalizeEnum(data.meeting_type || data.meetingType, "meetingType") || "Evaluation",
+    date_time: toIso(data.date_time || data.dateTime || data.date),
+    meeting_type: normalizeEnum(data.meeting_type || data.meetingType || data.type, "meetingType") || "Evaluation",
     location: data.location || "Office",
     status: normalizeEnum(data.status, "appointmentStatus") || "Scheduled",
     notes: data.notes || "",
@@ -353,16 +359,16 @@ function fromBillingRecord(id, data) {
   return {
     ...data,
     ...withDates(id, data),
-    client_id: data.client_id || data.clientId || "",
-    client_name: data.client_name || data.clientName || "",
-    service_type: data.service_type || data.serviceType || "",
-    appointment_date: toIso(data.appointment_date || data.appointmentDate),
+    client_id: data.client_id || data.clientId || data.student_id || data.studentId || "",
+    client_name: data.client_name || data.clientName || data.student_name || data.studentName || "",
+    service_type: data.service_type || data.serviceType || data.type || "",
+    appointment_date: toIso(data.appointment_date || data.appointmentDate || data.due_date || data.dueDate || data.date),
     amount: Number(data.amount || 0),
     billing_status:
-      normalizeEnum(data.billing_status || data.billingStatus, "billingStatus") || "Not Billed",
+      normalizeEnum(data.billing_status || data.billingStatus || data.status, "billingStatus") || "Not Billed",
     invoice_number: data.invoice_number || data.invoiceNumber || "",
     paid_date: toIso(data.paid_date || data.paidDate),
-    payment_method: data.payment_method || data.paymentMethod || "",
+    payment_method: data.payment_method || data.paymentMethod || data.method || "",
     notes: data.notes || "",
   };
 }
@@ -426,8 +432,27 @@ function sortRows(rows, sortSpec) {
   });
 }
 
+function collectionAliases(entityName) {
+  const names = collectionNames[entityName];
+  return Array.isArray(names) ? names : [names];
+}
+
+function primaryCollectionName(entityName) {
+  return collectionAliases(entityName)[0];
+}
+
+async function findDocumentInCollections(entityName, id) {
+  for (const collectionName of collectionAliases(entityName)) {
+    const snapshot = await getDoc(doc(db, collectionName, id));
+    if (snapshot.exists()) {
+      return { collectionName, snapshot };
+    }
+  }
+  return null;
+}
+
 function createEntity(entityName) {
-  const collectionName = collectionNames[entityName];
+  const collectionName = primaryCollectionName(entityName);
   const transformer = transforms[entityName];
 
   if (!collectionName || !transformer) {
@@ -436,9 +461,11 @@ function createEntity(entityName) {
 
   return {
     async list(sortSpec, limitCount) {
-      const snapshot = await getDocs(collection(db, collectionName));
-      const rows = snapshot.docs.map((document) =>
-        transformer.fromDb(document.id, document.data())
+      const snapshots = await Promise.all(
+        collectionAliases(entityName).map((name) => getDocs(collection(db, name)))
+      );
+      const rows = snapshots.flatMap((snapshot) =>
+        snapshot.docs.map((document) => transformer.fromDb(document.id, document.data()))
       );
       const sorted = sortRows(rows, sortSpec);
       return limitCount ? sorted.slice(0, limitCount) : sorted;
@@ -453,16 +480,16 @@ function createEntity(entityName) {
     },
 
     async get(id) {
-      const snapshot = await getDoc(doc(db, collectionName, id));
-      if (!snapshot.exists()) return null;
-      return transformer.fromDb(snapshot.id, snapshot.data());
+      const result = await findDocumentInCollections(entityName, id);
+      if (!result) return null;
+      return transformer.fromDb(result.snapshot.id, result.snapshot.data());
     },
 
     async create(data) {
       const now = new Date().toISOString();
       const sourceData = { ...(data || {}) };
       if (entityName === "Client" && !normalizeClientId(sourceData.client_id || sourceData.clientId)) {
-        sourceData.client_id = await nextFourDigitClientId(collectionName, transformer);
+        sourceData.client_id = await nextFourDigitClientId(entityName, transformer);
       }
       const payload = compact({
         ...transformer.toDb(sourceData),
@@ -480,19 +507,21 @@ function createEntity(entityName) {
       const sourceData = { ...(data || {}) };
       if (entityName === "Client" && !normalizeClientId(sourceData.client_id || sourceData.clientId)) {
         const existing = await this.get(id);
-        sourceData.client_id = existing?.client_id || (await nextFourDigitClientId(collectionName, transformer));
+        sourceData.client_id = existing?.client_id || (await nextFourDigitClientId(entityName, transformer));
       }
       const payload = compact({
         ...transformer.toDb(sourceData),
         updatedAt: now,
         updated_date: now,
       });
-      await updateDoc(doc(db, collectionName, id), payload);
+      const target = await findDocumentInCollections(entityName, id);
+      await updateDoc(doc(db, target?.collectionName || collectionName, id), payload);
       return this.get(id);
     },
 
     async delete(id) {
-      await deleteDoc(doc(db, collectionName, id));
+      const target = await findDocumentInCollections(entityName, id);
+      await deleteDoc(doc(db, target?.collectionName || collectionName, id));
       return true;
     },
   };
