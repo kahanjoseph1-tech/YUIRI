@@ -8,6 +8,7 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import RoleGate from '@/components/RoleGate';
+import TextOverrideEditor from '@/components/TextOverrideEditor';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -180,6 +181,7 @@ function App() {
         </Router>
         <Toaster />
         <SonnerToaster richColors position="top-right" />
+        <TextOverrideEditor />
       </QueryClientProvider>
     </AuthProvider>
   )
