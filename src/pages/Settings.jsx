@@ -9,6 +9,7 @@ import {
   DEFAULT_DROPDOWN_OPTIONS,
   DROPDOWN_GROUPS,
   DROPDOWN_OPTIONS_QUERY_KEY,
+  DROPDOWN_SECTIONS,
   getDropdownOptions,
   saveDropdownOptions,
   uniqueOptions,
@@ -17,6 +18,7 @@ import {
 export default function Settings() {
   const queryClient = useQueryClient();
   const [drafts, setDrafts] = useState({});
+  const [activeSection, setActiveSection] = useState(DROPDOWN_SECTIONS[0]?.key || "clients");
 
   const { data: dropdowns = DEFAULT_DROPDOWN_OPTIONS, isLoading } = useQuery({
     queryKey: DROPDOWN_OPTIONS_QUERY_KEY,
@@ -63,11 +65,26 @@ export default function Settings() {
     });
   };
 
+  const activeGroups = DROPDOWN_GROUPS.filter((group) => group.section === activeSection);
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-        <p className="text-sm text-gray-500 mt-1">Dropdowns</p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {DROPDOWN_SECTIONS.map((section) => (
+          <Button
+            key={section.key}
+            type="button"
+            variant={activeSection === section.key ? "default" : "outline"}
+            className={activeSection === section.key ? "bg-[#1e3a5f] hover:bg-[#1e3a5f]/90" : ""}
+            onClick={() => setActiveSection(section.key)}
+          >
+            {section.label}
+          </Button>
+        ))}
       </div>
 
       {isLoading ? (
@@ -78,7 +95,7 @@ export default function Settings() {
         </div>
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          {DROPDOWN_GROUPS.map((group) => {
+          {activeGroups.map((group) => {
             const options = dropdowns[group.key] || [];
             return (
               <section key={group.key} className="bg-white border border-gray-100 rounded-2xl p-4 space-y-4">

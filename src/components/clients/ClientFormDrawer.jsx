@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Plus, Trash2 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,8 +12,10 @@ import {
   DEFAULT_DROPDOWN_OPTIONS,
   DROPDOWN_OPTIONS_QUERY_KEY,
   getDropdownOptions,
+  saveDropdownOptions,
   uniqueOptions,
 } from "@/lib/dropdownSettings";
+import { useRole } from "@/lib/useRole";
 
 const EMPTY = {
   boy_first_name: "", boy_last_name: "", age: "",
@@ -51,14 +54,29 @@ function Field({ label, children, full }) {
 }
 
 export default function ClientFormDrawer({ open, onOpenChange, client, evaluators = [], onSave }) {
+  const queryClient = useQueryClient();
+  const { isAdmin } = useRole();
   const [form, setForm] = useState(EMPTY);
   const [phoneRows, setPhoneRows] = useState([emptyPhoneRow()]);
   const [needsText, setNeedsText] = useState("");
+  const [callerNameDraft, setCallerNameDraft] = useState("");
+  const [responsibleNameDraft, setResponsibleNameDraft] = useState("");
   const [saving, setSaving] = useState(false);
 
   const { data: dropdownOptions = DEFAULT_DROPDOWN_OPTIONS } = useQuery({
     queryKey: DROPDOWN_OPTIONS_QUERY_KEY,
     queryFn: getDropdownOptions,
+  });
+
+  const saveOptionsMutation = useMutation({
+    mutationFn: saveDropdownOptions,
+    onSuccess: (saved) => {
+      queryClient.setQueryData(DROPDOWN_OPTIONS_QUERY_KEY, saved);
+    },
+    onError: (error) => {
+      console.error("Failed to save dropdown option:", error);
+      toast.error("Failed to add name");
+    },
   });
 
   useEffect(() => {
@@ -114,6 +132,25 @@ export default function ClientFormDrawer({ open, onOpenChange, client, evaluator
   );
 
   const update = (field, value) => setForm((p) => ({ ...p, [field]: value }));
+
+  const addDropdownName = (key, value, field, clearDraft) => {
+    const cleanedValue = String(value || "").trim();
+    if (!cleanedValue) return;
+
+    saveOptionsMutation.mutate(
+      {
+        ...dropdownOptions,
+        [key]: uniqueOptions([...(dropdownOptions[key] || []), cleanedValue]),
+      },
+      {
+        onSuccess: () => {
+          update(field, cleanedValue);
+          clearDraft("");
+          toast.success("Name added");
+        },
+      }
+    );
+  };
 
   const updatePhoneRow = (index, field, value) => {
     setPhoneRows((rows) =>
@@ -269,12 +306,40 @@ export default function ClientFormDrawer({ open, onOpenChange, client, evaluator
             <Input value={form.city} onChange={(e) => update("city", e.target.value)} />
           </Field>
           <Field label="ווער רופט">
-            <Select value={form.caller_source || ""} onValueChange={(v) => update("caller_source", v)}>
-              <SelectTrigger><SelectValue placeholder="Select option" /></SelectTrigger>
-              <SelectContent>
-                {callerOptions.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <div className="space-y-2">
+              <Select value={form.caller_source || ""} onValueChange={(v) => update("caller_source", v)}>
+                <SelectTrigger><SelectValue placeholder="Select option" /></SelectTrigger>
+                <SelectContent>
+                  {callerOptions.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {isAdmin && (
+                <div className="flex gap-2">
+                  <Input
+                    value={callerNameDraft}
+                    onChange={(event) => setCallerNameDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        addDropdownName("caller_options", callerNameDraft, "caller_source", setCallerNameDraft);
+                      }
+                    }}
+                    placeholder="Add name"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-10 w-10 shrink-0"
+                    onClick={() => addDropdownName("caller_options", callerNameDraft, "caller_source", setCallerNameDraft)}
+                    disabled={saveOptionsMutation.isPending}
+                    aria-label="Add caller name"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
           </Field>
           <Field label="סיבה">
             <Select
@@ -295,16 +360,44 @@ export default function ClientFormDrawer({ open, onOpenChange, client, evaluator
             </Select>
           </Field>
           <Field label="Responsible">
-            <Select
-              value={form.responsible_person || "none"}
-              onValueChange={(v) => update("responsible_person", v === "none" ? "" : v)}
-            >
-              <SelectTrigger><SelectValue placeholder="Unassigned" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Unassigned</SelectItem>
-                {responsibleOptions.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <div className="space-y-2">
+              <Select
+                value={form.responsible_person || "none"}
+                onValueChange={(v) => update("responsible_person", v === "none" ? "" : v)}
+              >
+                <SelectTrigger><SelectValue placeholder="Unassigned" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Unassigned</SelectItem>
+                  {responsibleOptions.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {isAdmin && (
+                <div className="flex gap-2">
+                  <Input
+                    value={responsibleNameDraft}
+                    onChange={(event) => setResponsibleNameDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        addDropdownName("responsible_options", responsibleNameDraft, "responsible_person", setResponsibleNameDraft);
+                      }
+                    }}
+                    placeholder="Add name"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-10 w-10 shrink-0"
+                    onClick={() => addDropdownName("responsible_options", responsibleNameDraft, "responsible_person", setResponsibleNameDraft)}
+                    disabled={saveOptionsMutation.isPending}
+                    aria-label="Add responsible name"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
           </Field>
           <Field label="Special Needs (comma separated)" full>
             <Input value={needsText} onChange={(e) => setNeedsText(e.target.value)} placeholder="ADHD, Speech, Dyslexia..." />

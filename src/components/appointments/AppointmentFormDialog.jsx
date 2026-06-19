@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,7 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Combobox from "@/components/common/Combobox";
-import { MEETING_TYPES, APPOINTMENT_STATUSES } from "@/lib/constants";
+import {
+  DEFAULT_DROPDOWN_OPTIONS,
+  DROPDOWN_OPTIONS_QUERY_KEY,
+  getDropdownOptions,
+  uniqueOptions,
+} from "@/lib/dropdownSettings";
 
 // Converts a stored ISO datetime to a value for <input type="datetime-local">.
 function toLocalInput(iso) {
@@ -31,6 +37,11 @@ export default function AppointmentFormDialog({
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
 
+  const { data: dropdownOptions = DEFAULT_DROPDOWN_OPTIONS } = useQuery({
+    queryKey: DROPDOWN_OPTIONS_QUERY_KEY,
+    queryFn: getDropdownOptions,
+  });
+
   useEffect(() => {
     if (!open) return;
     setForm(appointment
@@ -47,6 +58,21 @@ export default function AppointmentFormDialog({
   }, [open, appointment, defaultClientId, defaultDateTime, defaultLocation]);
 
   const update = (field, value) => setForm((p) => ({ ...p, [field]: value }));
+
+  const meetingTypeOptions = useMemo(
+    () => uniqueOptions([...(dropdownOptions.meeting_types || []), form.meeting_type]),
+    [dropdownOptions.meeting_types, form.meeting_type]
+  );
+
+  const appointmentStatusOptions = useMemo(
+    () => uniqueOptions([...(dropdownOptions.appointment_statuses || []), form.status]),
+    [dropdownOptions.appointment_statuses, form.status]
+  );
+
+  const locationOptions = useMemo(
+    () => uniqueOptions([...(dropdownOptions.appointment_locations || []), form.location]),
+    [dropdownOptions.appointment_locations, form.location]
+  );
 
   const handleSave = async () => {
     setSaving(true);
@@ -107,20 +133,32 @@ export default function AppointmentFormDialog({
               <Label className="text-xs font-medium text-gray-500">Type</Label>
               <Select value={form.meeting_type} onValueChange={(v) => update("meeting_type", v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{MEETING_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                <SelectContent>{meetingTypeOptions.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs font-medium text-gray-500">Location / Zoom Link</Label>
-            <Input value={form.location || ""} onChange={(e) => update("location", e.target.value)} placeholder="Office" />
+            <div className="grid grid-cols-1 sm:grid-cols-[11rem_minmax(0,1fr)] gap-2">
+              <Select
+                value={locationOptions.includes(form.location) ? form.location : "__custom__"}
+                onValueChange={(v) => update("location", v === "__custom__" ? "" : v)}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__custom__">Custom</SelectItem>
+                  {locationOptions.map((location) => <SelectItem key={location} value={location}>{location}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Input value={form.location || ""} onChange={(e) => update("location", e.target.value)} placeholder="Office" />
+            </div>
           </div>
           {appointment && (
             <div className="space-y-1.5">
               <Label className="text-xs font-medium text-gray-500">Status</Label>
               <Select value={form.status} onValueChange={(v) => update("status", v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{APPOINTMENT_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                <SelectContent>{appointmentStatusOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           )}
