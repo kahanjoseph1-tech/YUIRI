@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import {
   LayoutDashboard, Users, Calendar, ClipboardList, GraduationCap,
-  ArrowRightLeft, DollarSign, BarChart3, Settings, Menu, X, LogOut, ChevronDown,
+  BriefcaseBusiness, ArrowRightLeft, DollarSign, BarChart3, Settings, Menu, X, LogOut, ChevronDown,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -16,7 +16,7 @@ import { ROLE_LABELS } from "@/lib/constants";
 
 const ICONS = {
   LayoutDashboard, Users, Calendar, ClipboardList,
-  GraduationCap, ArrowRightLeft, DollarSign, BarChart3, Settings,
+  GraduationCap, BriefcaseBusiness, ArrowRightLeft, DollarSign, BarChart3, Settings,
 };
 
 export default function Layout({ children, currentPageName }) {

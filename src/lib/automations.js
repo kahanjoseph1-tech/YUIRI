@@ -25,6 +25,43 @@ function evaluationBillingDetails(evaluation) {
   };
 }
 
+async function ensureOpenCaseForEvaluation(evaluation) {
+  if (!evaluation?.client_id) return null;
+
+  const details = {
+    client_id: evaluation.client_id,
+    client_name: evaluation.client_name || "",
+    evaluation_id: evaluation.id || "",
+    appointment_id: evaluation.appointment_id || "",
+    appointment_date: evaluation.appointment_date || "",
+    evaluator_id: evaluation.evaluator_id || "",
+    evaluator_name: evaluation.evaluator_name || "",
+    status: "Open",
+    priority: evaluation.urgency || "Medium",
+    opened_date: new Date().toISOString(),
+    last_activity_date: new Date().toISOString(),
+  };
+
+  try {
+    const openCases = await firebaseClient.entities.OpenCase.list("-created_date", 1000);
+    const existing = openCases.find((record) =>
+      record.evaluation_id === evaluation.id ||
+      (record.client_id === evaluation.client_id && record.status !== "Closed")
+    );
+
+    if (existing) {
+      return firebaseClient.entities.OpenCase.update(existing.id, {
+        ...details,
+        opened_date: existing.opened_date || details.opened_date,
+      });
+    }
+  } catch {
+    // If lookup fails, still create the case so completed evaluations surface.
+  }
+
+  return firebaseClient.entities.OpenCase.create(details);
+}
+
 export async function ensureEvaluationBillingForAppointment(appointment) {
   if (!appointment || (appointment.meeting_type || "Evaluation") !== "Evaluation") return null;
 
@@ -138,6 +175,8 @@ export async function onAppointmentCompleted(appointment) {
 //    and open a "Not Billed" Evaluation billing record for billing staff.
 export async function onEvaluationCompleted(evaluation) {
   if (!evaluation) return;
+
+  await ensureOpenCaseForEvaluation(evaluation);
 
   if (evaluation.client_id) {
     await firebaseClient.entities.Client.update(evaluation.client_id, {

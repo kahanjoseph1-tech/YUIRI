@@ -11,6 +11,7 @@ import Clients from './pages/Clients';
 import ClientDetail from './pages/ClientDetail';
 import Appointments from './pages/Appointments';
 import Evaluations from './pages/Evaluations';
+import OpenCases from './pages/OpenCases';
 import Schools from './pages/Schools';
 import Placements from './pages/Placements';
 import Billing from './pages/Billing';
@@ -26,6 +27,7 @@ export const PAGES = {
     "ClientDetail": ClientDetail,
     "Appointments": Appointments,
     "Evaluations": Evaluations,
+    "OpenCases": OpenCases,
     "Schools": Schools,
     "Placements": Placements,
     "Billing": Billing,

@@ -6,7 +6,7 @@ import { createPageUrl } from "@/utils";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Pencil, CalendarPlus, FileText, Phone, Mail, MapPin, GraduationCap } from "lucide-react";
+import { ArrowLeft, Pencil, CalendarPlus, FileText, Phone, Mail, MapPin, GraduationCap, Trash2 } from "lucide-react";
 import StatusBadge from "@/components/StatusBadge";
 import ClientFormDrawer from "@/components/clients/ClientFormDrawer";
 import AppointmentFormDialog from "@/components/appointments/AppointmentFormDialog";
@@ -70,6 +70,12 @@ export default function ClientDetail() {
   const { data: billing = [] } = useQuery({
     queryKey: ["billing"], queryFn: () => firebaseClient.entities.BillingRecord.list("-created_date", 1000),
   });
+  const { data: placements = [] } = useQuery({
+    queryKey: ["placements"], queryFn: () => firebaseClient.entities.Placement.list("-created_date", 1000),
+  });
+  const { data: openCases = [] } = useQuery({
+    queryKey: ["open_cases"], queryFn: () => firebaseClient.entities.OpenCase.list("-created_date", 1000),
+  });
   const client = clients.find((c) => c.id === id);
 
   const updateMutation = useMutation({
@@ -95,6 +101,30 @@ export default function ClientDetail() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["billing"] }); toast.success("Billing record created"); },
     onError: () => toast.error("Failed to create record"),
   });
+  const deleteClient = useMutation({
+    mutationFn: async () => {
+      const relatedDeletes = [
+        ...appointments.filter((record) => record.client_id === id).map((record) => firebaseClient.entities.Appointment.delete(record.id)),
+        ...evaluations.filter((record) => record.client_id === id).map((record) => firebaseClient.entities.Evaluation.delete(record.id)),
+        ...billing.filter((record) => record.client_id === id).map((record) => firebaseClient.entities.BillingRecord.delete(record.id)),
+        ...placements.filter((record) => record.client_id === id).map((record) => firebaseClient.entities.Placement.delete(record.id)),
+        ...openCases.filter((record) => record.client_id === id).map((record) => firebaseClient.entities.OpenCase.delete(record.id)),
+      ];
+      await Promise.all(relatedDeletes);
+      await firebaseClient.entities.Client.delete(id);
+    },
+    onSuccess: () => {
+      ["clients", "appointments", "evaluations", "billing", "placements", "open_cases"].forEach((key) =>
+        queryClient.invalidateQueries({ queryKey: [key] })
+      );
+      toast.success("Client deleted");
+      navigate(createPageUrl("Clients"));
+    },
+    onError: (error) => {
+      console.error("Failed to delete client:", error);
+      toast.error(error?.message || "Failed to delete client");
+    },
+  });
 
   if (isLoading) {
     return <div className="space-y-4"><Skeleton className="h-8 w-48" /><Skeleton className="h-40 rounded-2xl" /></div>;
@@ -111,6 +141,12 @@ export default function ClientDetail() {
   const myAppts = appointments.filter((a) => a.client_id === id);
   const myEvals = evaluations.filter((e) => e.client_id === id);
   const myBilling = billing.filter((b) => b.client_id === id);
+
+  const handleDeleteClient = () => {
+    const name = `${client.boy_first_name || ""} ${client.boy_last_name || ""}`.trim() || "this client";
+    const confirmed = window.confirm(`Delete ${name} and all related appointments, evaluations, billing records, placements, and open cases?`);
+    if (confirmed) deleteClient.mutate();
+  };
 
   const timeline = [
     ...myAppts.map((a) => ({ ts: a.date_time || a.created_date, type: "Appointment", label: `${a.meeting_type || "Meeting"}`, status: a.status })),
@@ -158,9 +194,14 @@ export default function ClientDetail() {
               </Button>
             )}
             {canEditClient && (
-              <Button className="gap-2 bg-[#1e3a5f] hover:bg-[#1e3a5f]/90" onClick={() => setEditOpen(true)}>
-                <Pencil className="w-4 h-4" /> Edit
-              </Button>
+              <>
+                <Button variant="outline" className="gap-2 text-red-600 hover:text-red-700" onClick={handleDeleteClient} disabled={deleteClient.isPending}>
+                  <Trash2 className="w-4 h-4" /> Delete
+                </Button>
+                <Button className="gap-2 bg-[#1e3a5f] hover:bg-[#1e3a5f]/90" onClick={() => setEditOpen(true)}>
+                  <Pencil className="w-4 h-4" /> Edit
+                </Button>
+              </>
             )}
           </div>
         </div>

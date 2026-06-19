@@ -89,6 +89,10 @@ service cloud.firestore {
       allow read, write: if currentUserIsApproved();
     }
 
+    match /open_cases/{document} {
+      allow read, write: if currentUserIsApproved();
+    }
+
     match /billing/{document} {
       allow read, write: if currentUserIsApproved();
     }
