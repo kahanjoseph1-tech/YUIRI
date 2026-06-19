@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Combobox from "@/components/common/Combobox";
-import { SERVICE_TYPES, BILLING_STATUSES } from "@/lib/constants";
+import { SERVICE_TYPES, BILLING_STATUSES, PAYMENT_METHODS } from "@/lib/constants";
 
 // Create or edit a billing record.
 export default function BillingFormDialog({ open, onOpenChange, record, clients = [], onSave }) {
@@ -28,6 +28,7 @@ export default function BillingFormDialog({ open, onOpenChange, record, clients 
       await onSave({
         ...form,
         amount: form.amount !== "" && form.amount != null ? Number(form.amount) : 0,
+        card_last4: String(form.card_last4 || "").replace(/\D/g, "").slice(-4),
         client_name: client ? `${client.boy_first_name} ${client.boy_last_name}` : form.client_name,
       });
       onOpenChange(false);
@@ -75,6 +76,29 @@ export default function BillingFormDialog({ open, onOpenChange, record, clients 
                 <SelectContent>{BILLING_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
               </Select>
             </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-gray-500">Payment Method</Label>
+              <Select value={form.payment_method || ""} onValueChange={(v) => update("payment_method", v)}>
+                <SelectTrigger><SelectValue placeholder="Select method" /></SelectTrigger>
+                <SelectContent>{PAYMENT_METHODS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-gray-500">Card last 4</Label>
+              <Input
+                inputMode="numeric"
+                maxLength={4}
+                value={form.card_last4 || ""}
+                onChange={(e) => update("card_last4", e.target.value.replace(/\D/g, "").slice(0, 4))}
+                placeholder="1234"
+              />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-gray-500">Payment Note</Label>
+            <Textarea rows={2} value={form.payment_note || ""} onChange={(e) => update("payment_note", e.target.value)} />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs font-medium text-gray-500">Notes</Label>

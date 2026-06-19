@@ -11,6 +11,7 @@ import StatusBadge from "@/components/StatusBadge";
 import ClientFormDrawer from "@/components/clients/ClientFormDrawer";
 import AppointmentFormDialog from "@/components/appointments/AppointmentFormDialog";
 import BillingFormDialog from "@/components/billing/BillingFormDialog";
+import { ensureEvaluationBillingForAppointment } from "@/lib/automations";
 import { can } from "@/lib/roles";
 import { useRole } from "@/lib/useRole";
 import { fmtDate, fmtDateTime } from "@/lib/format";
@@ -69,12 +70,7 @@ export default function ClientDetail() {
   const { data: billing = [] } = useQuery({
     queryKey: ["billing"], queryFn: () => firebaseClient.entities.BillingRecord.list("-created_date", 1000),
   });
-  const { data: users = [] } = useQuery({
-    queryKey: ["users"], queryFn: () => firebaseClient.entities.User.list("-created_date", 200),
-  });
-
   const client = clients.find((c) => c.id === id);
-  const evaluators = users.filter((u) => u.approval_status === "approved");
 
   const updateMutation = useMutation({
     mutationFn: ({ data }) => firebaseClient.entities.Client.update(id, data),
@@ -82,8 +78,16 @@ export default function ClientDetail() {
     onError: () => toast.error("Update failed"),
   });
   const createAppt = useMutation({
-    mutationFn: (data) => firebaseClient.entities.Appointment.create(data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["appointments"] }); toast.success("Appointment scheduled"); },
+    mutationFn: async (data) => {
+      const appointment = await firebaseClient.entities.Appointment.create(data);
+      await ensureEvaluationBillingForAppointment(appointment);
+      return appointment;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      queryClient.invalidateQueries({ queryKey: ["billing"] });
+      toast.success("Appointment scheduled");
+    },
     onError: () => toast.error("Failed to schedule"),
   });
   const createBill = useMutation({
@@ -122,7 +126,15 @@ export default function ClientDetail() {
 
       <div className="bg-white rounded-2xl border border-gray-100 p-6">
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-          <div>
+          <div className="flex items-start gap-4 min-w-0">
+            {client.profile_photo?.url && (
+              <img
+                src={client.profile_photo.url}
+                alt={`${client.boy_first_name || ""} ${client.boy_last_name || ""}`}
+                className="h-20 w-20 rounded-xl object-cover border border-gray-100 shrink-0"
+              />
+            )}
+            <div className="min-w-0">
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold text-gray-900">{client.boy_first_name} {client.boy_last_name}</h1>
               <StatusBadge status={client.status} />
@@ -132,6 +144,7 @@ export default function ClientDetail() {
               {client.age ? `ווי אלט ${client.age}` : ""}{client.age && client.grade_level ? " · " : ""}{client.grade_level || ""}
               {client.religious_level ? ` · ${client.religious_level}` : ""}
             </p>
+            </div>
           </div>
           <div className="flex flex-wrap gap-2">
             {canSchedule && (
@@ -177,6 +190,26 @@ export default function ClientDetail() {
             {client.notes && <p><span className="text-gray-400">Notes:</span> {client.notes}</p>}
           </div>
         )}
+
+        {client.files?.length > 0 && (
+          <div className="mt-5 pt-5 border-t border-gray-50">
+            <h3 className="text-sm font-semibold text-gray-900 mb-2">Files</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {client.files.map((file, index) => (
+                <a
+                  key={`${file.path || file.url}-${index}`}
+                  href={file.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-2 rounded-lg border border-gray-100 px-3 py-2 text-sm text-blue-700 hover:bg-blue-50"
+                >
+                  <FileText className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{file.name || "File"}</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-100">
@@ -201,12 +234,12 @@ export default function ClientDetail() {
       </div>
 
       <ClientFormDrawer
-        open={editOpen} onOpenChange={setEditOpen} client={client} evaluators={evaluators}
+        open={editOpen} onOpenChange={setEditOpen} client={client}
         onSave={(data) => updateMutation.mutateAsync({ data })}
       />
       <AppointmentFormDialog
         open={apptOpen} onOpenChange={setApptOpen}
-        clients={clients} evaluators={evaluators} defaultClientId={id}
+        clients={clients} defaultClientId={id}
         onSave={(data) => createAppt.mutateAsync(data)}
       />
       <BillingFormDialog

@@ -18,6 +18,47 @@ async function getById(entity, id) {
   }
 }
 
+export async function ensureEvaluationBillingForAppointment(appointment) {
+  if (!appointment || (appointment.meeting_type || "Evaluation") !== "Evaluation") return null;
+
+  const amountDue = Number(appointment.payment_amount_due || 0);
+  if (amountDue <= 0) return null;
+
+  const billingDetails = {
+    appointment_id: appointment.id,
+    client_id: appointment.client_id,
+    client_name: appointment.client_name,
+    service_type: "Evaluation",
+    appointment_date: appointment.date_time,
+    amount: amountDue,
+    billing_status: "Invoice Sent",
+    payment_method: appointment.payment_method || "",
+    payment_note: appointment.payment_note || "",
+    card_last4: appointment.card_last4 || "",
+    notes: appointment.payment_note || "",
+  };
+
+  try {
+    const billing = await firebaseClient.entities.BillingRecord.list("-created_date", 1000);
+    const existing = billing.find((record) =>
+      record.appointment_id === appointment.id ||
+      (record.client_id === appointment.client_id &&
+        record.service_type === "Evaluation" &&
+        record.appointment_date === appointment.date_time)
+    );
+    if (existing) {
+      return firebaseClient.entities.BillingRecord.update(existing.id, billingDetails);
+    }
+  } catch {
+    // If the duplicate lookup fails, still create the amount due.
+  }
+
+  return firebaseClient.entities.BillingRecord.create({
+    ...billingDetails,
+    billing_status: "Invoice Sent",
+  });
+}
+
 // 1. Appointment -> "Completed": create a Pending Evaluation (once) and move
 //    the client to "Evaluating".
 export async function onAppointmentCompleted(appointment) {
@@ -59,19 +100,38 @@ export async function onEvaluationCompleted(evaluation) {
     });
   }
 
+  let appointment;
   let appointmentDate;
   if (evaluation.appointment_id) {
-    const appt = await getById("Appointment", evaluation.appointment_id);
-    appointmentDate = appt?.date_time;
+    appointment = await getById("Appointment", evaluation.appointment_id);
+    appointmentDate = appointment?.date_time;
+  }
+
+  try {
+    const billing = await firebaseClient.entities.BillingRecord.list("-created_date", 1000);
+    const alreadyBilled = billing.some((record) =>
+      (evaluation.appointment_id && record.appointment_id === evaluation.appointment_id) ||
+      (record.client_id === evaluation.client_id &&
+        record.service_type === "Evaluation" &&
+        (!appointmentDate || record.appointment_date === appointmentDate))
+    );
+    if (alreadyBilled) return;
+  } catch {
+    // If the duplicate check fails, continue with the fallback billing record.
   }
 
   await firebaseClient.entities.BillingRecord.create({
+    appointment_id: evaluation.appointment_id,
     client_id: evaluation.client_id,
     client_name: evaluation.client_name,
     service_type: "Evaluation",
-    billing_status: "Not Billed",
-    amount: 0,
+    billing_status: "Invoice Sent",
+    amount: Number(appointment?.payment_amount_due || 300),
     appointment_date: appointmentDate,
+    payment_method: appointment?.payment_method || "",
+    payment_note: appointment?.payment_note || "",
+    card_last4: appointment?.card_last4 || "",
+    notes: appointment?.payment_note || "",
   });
 }
 

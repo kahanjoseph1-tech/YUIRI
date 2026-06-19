@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { FileText, ImageIcon, Plus, Trash2, UploadCloud } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,10 +14,12 @@ import {
   getDropdownOptions,
   uniqueOptions,
 } from "@/lib/dropdownSettings";
+import { storage } from "@/lib/firebase";
 
 const EMPTY = {
   boy_first_name: "", boy_last_name: "", age: "",
   father_name: "", parent_phone: "", parent_email: "",
+  profile_photo: null, files: [],
   city: "", current_school: "", shiur: "", reason: "", caller_source: "", caller_name: "", referral_source: "",
   responsible_person: "", responsible_name: "",
   family_expectations: "", notes: "", status: "New Client",
@@ -24,6 +27,36 @@ const EMPTY = {
 };
 
 const emptyPhoneRow = () => ({ tag: "Father's Cell", custom_label: "", number: "" });
+
+function makeId() {
+  return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function safeFileName(name) {
+  return String(name || "file").replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "file";
+}
+
+function formatFileSize(bytes) {
+  const size = Number(bytes || 0);
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+async function uploadClientFile(file, clientKey, folder) {
+  const path = `clients/${clientKey}/${folder}/${makeId()}-${safeFileName(file.name)}`;
+  const fileRef = ref(storage, path);
+  await uploadBytes(fileRef, file, { contentType: file.type || "application/octet-stream" });
+  const url = await getDownloadURL(fileRef);
+  return {
+    name: file.name,
+    url,
+    path,
+    content_type: file.type || "",
+    size: file.size || 0,
+    uploaded_date: new Date().toISOString(),
+  };
+}
 
 function phoneRowsFromClient(client) {
   if (Array.isArray(client?.phone_numbers) && client.phone_numbers.length > 0) {
@@ -51,9 +84,13 @@ function Field({ label, children, full }) {
 }
 
 export default function ClientFormDrawer({ open, onOpenChange, client, onSave }) {
+  const uploadGroupRef = useRef(makeId());
   const [form, setForm] = useState(EMPTY);
   const [phoneRows, setPhoneRows] = useState([emptyPhoneRow()]);
   const [needsText, setNeedsText] = useState("");
+  const [pendingPhoto, setPendingPhoto] = useState(null);
+  const [pendingFiles, setPendingFiles] = useState([]);
+  const [draggingFiles, setDraggingFiles] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const { data: dropdownOptions = DEFAULT_DROPDOWN_OPTIONS } = useQuery({
@@ -63,6 +100,7 @@ export default function ClientFormDrawer({ open, onOpenChange, client, onSave })
 
   useEffect(() => {
     if (open) {
+      uploadGroupRef.current = client?.id || makeId();
       const nextForm = client
         ? {
             ...EMPTY,
@@ -75,6 +113,9 @@ export default function ClientFormDrawer({ open, onOpenChange, client, onSave })
       setForm(nextForm);
       setPhoneRows(phoneRowsFromClient(client));
       setNeedsText((client?.special_needs || []).join(", "));
+      setPendingPhoto(null);
+      setPendingFiles([]);
+      setDraggingFiles(false);
     }
   }, [open, client]);
 
@@ -112,6 +153,23 @@ export default function ClientFormDrawer({ open, onOpenChange, client, onSave })
 
   const update = (field, value) => setForm((p) => ({ ...p, [field]: value }));
 
+  const addPendingFiles = (fileList) => {
+    const files = Array.from(fileList || []);
+    if (files.length === 0) return;
+    setPendingFiles((current) => [...current, ...files]);
+  };
+
+  const removeExistingFile = (index) => {
+    setForm((current) => ({
+      ...current,
+      files: (current.files || []).filter((_, fileIndex) => fileIndex !== index),
+    }));
+  };
+
+  const removePendingFile = (index) => {
+    setPendingFiles((current) => current.filter((_, fileIndex) => fileIndex !== index));
+  };
+
   const updatePhoneRow = (index, field, value) => {
     setPhoneRows((rows) =>
       rows.map((row, rowIndex) => (rowIndex === index ? { ...row, [field]: value } : row))
@@ -137,12 +195,21 @@ export default function ClientFormDrawer({ open, onOpenChange, client, onSave })
         .filter((phone) => phone.number);
       const callerSource = form.caller_source || form.referral_source || "";
       const responsiblePerson = form.responsible_person || "";
+      const clientKey = client?.id || form.client_id || uploadGroupRef.current;
+      const uploadedPhoto = pendingPhoto
+        ? await uploadClientFile(pendingPhoto, clientKey, "profile")
+        : form.profile_photo || null;
+      const uploadedFiles = pendingFiles.length > 0
+        ? await Promise.all(pendingFiles.map((file) => uploadClientFile(file, clientKey, "files")))
+        : [];
 
       await onSave({
         ...form,
         status: form.status || "New Client",
         age: form.age ? Number(form.age) : undefined,
         phone_numbers: cleanedPhones,
+        profile_photo: uploadedPhoto,
+        files: [...(Array.isArray(form.files) ? form.files : []), ...uploadedFiles],
         parent_phone: cleanedPhones[0]?.number || "",
         caller_source: callerSource,
         caller_name: String(form.caller_name || "").trim(),
@@ -186,6 +253,44 @@ export default function ClientFormDrawer({ open, onOpenChange, client, onSave })
                 onChange={(e) => update("boy_last_name", e.target.value)}
                 placeholder="Last name"
               />
+            </div>
+          </Field>
+
+          <Field label="Profile picture" full>
+            <div className="flex flex-col sm:flex-row gap-3 rounded-lg border border-gray-100 p-3">
+              <div className="h-20 w-20 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center overflow-hidden shrink-0">
+                {form.profile_photo?.url && !pendingPhoto ? (
+                  <img src={form.profile_photo.url} alt="Client profile" className="h-full w-full object-cover" />
+                ) : (
+                  <ImageIcon className="h-8 w-8 text-gray-300" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0 space-y-2">
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={(event) => {
+                    setPendingPhoto(event.target.files?.[0] || null);
+                    event.target.value = "";
+                  }}
+                />
+                <p className="text-xs text-gray-400 truncate">
+                  {pendingPhoto?.name || form.profile_photo?.name || "No profile picture selected"}
+                </p>
+                {(pendingPhoto || form.profile_photo) && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setPendingPhoto(null);
+                      update("profile_photo", null);
+                    }}
+                  >
+                    Remove picture
+                  </Button>
+                )}
+              </div>
             </div>
           </Field>
 
@@ -317,6 +422,63 @@ export default function ClientFormDrawer({ open, onOpenChange, client, onSave })
                 placeholder="Name for this client"
               />
             </div>
+          </Field>
+          <Field label="Files" full>
+            <div
+              className={`rounded-lg border border-dashed p-4 text-center transition-colors ${
+                draggingFiles ? "border-blue-400 bg-blue-50" : "border-gray-200 bg-gray-50/50"
+              }`}
+              onDragOver={(event) => {
+                event.preventDefault();
+                setDraggingFiles(true);
+              }}
+              onDragLeave={() => setDraggingFiles(false)}
+              onDrop={(event) => {
+                event.preventDefault();
+                setDraggingFiles(false);
+                addPendingFiles(event.dataTransfer.files);
+              }}
+            >
+              <UploadCloud className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+              <p className="text-sm font-medium text-gray-700">Drop files here</p>
+              <p className="text-xs text-gray-400 mb-3">or upload files from your computer</p>
+              <Input
+                type="file"
+                multiple
+                onChange={(event) => {
+                  addPendingFiles(event.target.files);
+                  event.target.value = "";
+                }}
+              />
+            </div>
+            {((form.files || []).length > 0 || pendingFiles.length > 0) && (
+              <div className="mt-3 rounded-lg border border-gray-100 divide-y divide-gray-100">
+                {(form.files || []).map((file, index) => (
+                  <div key={`${file.path || file.url}-${index}`} className="flex items-center justify-between gap-3 px-3 py-2">
+                    <a href={file.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 min-w-0 text-sm text-blue-700 hover:underline">
+                      <FileText className="h-4 w-4 shrink-0" />
+                      <span className="truncate">{file.name || "File"}</span>
+                      <span className="text-xs text-gray-400 shrink-0">{formatFileSize(file.size)}</span>
+                    </a>
+                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-gray-400 hover:text-red-600" onClick={() => removeExistingFile(index)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                {pendingFiles.map((file, index) => (
+                  <div key={`${file.name}-${file.size}-${index}`} className="flex items-center justify-between gap-3 px-3 py-2">
+                    <div className="flex items-center gap-2 min-w-0 text-sm text-gray-700">
+                      <FileText className="h-4 w-4 shrink-0 text-gray-400" />
+                      <span className="truncate">{file.name}</span>
+                      <span className="text-xs text-gray-400 shrink-0">{formatFileSize(file.size)}</span>
+                    </div>
+                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-gray-400 hover:text-red-600" onClick={() => removePendingFile(index)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </Field>
           <Field label="Special Needs (comma separated)" full>
             <Input value={needsText} onChange={(e) => setNeedsText(e.target.value)} placeholder="ADHD, Speech, Dyslexia..." />

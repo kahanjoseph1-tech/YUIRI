@@ -12,7 +12,7 @@ import AppointmentCalendar from "@/components/appointments/AppointmentCalendar";
 import AvailabilityDialog from "@/components/appointments/AvailabilityDialog";
 import DayScheduleDialog from "@/components/appointments/DayScheduleDialog";
 import { APPOINTMENT_STATUSES } from "@/lib/constants";
-import { onAppointmentCompleted } from "@/lib/automations";
+import { ensureEvaluationBillingForAppointment, onAppointmentCompleted } from "@/lib/automations";
 import { can } from "@/lib/roles";
 import { useRole } from "@/lib/useRole";
 import { fmtDateTime } from "@/lib/format";
@@ -46,24 +46,29 @@ export default function Appointments() {
   const { data: clients = [] } = useQuery({
     queryKey: ["clients"], queryFn: () => firebaseClient.entities.Client.list("-created_date", 1000),
   });
-  const { data: users = [] } = useQuery({
-    queryKey: ["users"], queryFn: () => firebaseClient.entities.User.list("-created_date", 200),
-  });
   const { data: availabilitySlots = [] } = useQuery({
     queryKey: ["appointment-availability"],
     queryFn: () => firebaseClient.entities.AppointmentAvailability.list("day_of_week", 500),
   });
-  const evaluators = users.filter((u) => u.approval_status === "approved");
 
   const createMutation = useMutation({
-    mutationFn: (data) => firebaseClient.entities.Appointment.create(data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["appointments"] }); toast.success("Appointment created"); },
+    mutationFn: async (data) => {
+      const appointment = await firebaseClient.entities.Appointment.create(data);
+      await ensureEvaluationBillingForAppointment(appointment);
+      return appointment;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      queryClient.invalidateQueries({ queryKey: ["billing"] });
+      toast.success("Appointment created");
+    },
     onError: () => toast.error("Failed to create"),
   });
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data, prev }) => {
       const updated = await firebaseClient.entities.Appointment.update(id, data);
+      await ensureEvaluationBillingForAppointment(updated);
       // Automation: status -> Completed creates an Evaluation + moves client to Evaluating.
       if (data.status === "Completed" && prev?.status !== "Completed") {
         await onAppointmentCompleted({ ...prev, ...data, id });
@@ -74,6 +79,7 @@ export default function Appointments() {
       queryClient.invalidateQueries({ queryKey: ["appointments"] });
       queryClient.invalidateQueries({ queryKey: ["evaluations"] });
       queryClient.invalidateQueries({ queryKey: ["clients"] });
+      queryClient.invalidateQueries({ queryKey: ["billing"] });
       if (vars.data.status === "Completed" && vars.prev?.status !== "Completed") {
         toast.success("Marked complete — evaluation created");
       } else {
@@ -198,14 +204,14 @@ export default function Appointments() {
 
       <AppointmentFormDialog
         open={showForm} onOpenChange={setShowForm}
-        clients={clients} evaluators={evaluators}
+        clients={clients}
         defaultDateTime={appointmentDefaults?.date_time || ""}
         defaultLocation={appointmentDefaults?.location || "Office"}
         onSave={(data) => createMutation.mutateAsync(data)}
       />
       <AppointmentFormDialog
         open={!!editAppt} onOpenChange={() => setEditAppt(null)}
-        appointment={editAppt} clients={clients} evaluators={evaluators}
+        appointment={editAppt} clients={clients}
         onSave={(data) => updateMutation.mutateAsync({ id: editAppt.id, data, prev: editAppt })}
       />
       <DayScheduleDialog

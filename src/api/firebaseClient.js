@@ -64,6 +64,23 @@ function normalizePhoneNumbers(value) {
     .filter((phone) => phone.number || phone.custom_label);
 }
 
+function normalizeFileMeta(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return {
+    name: value.name || "",
+    url: value.url || "",
+    path: value.path || "",
+    content_type: value.content_type || value.type || "",
+    size: Number(value.size || 0),
+    uploaded_date: toIso(value.uploaded_date),
+  };
+}
+
+function normalizeFiles(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map(normalizeFileMeta).filter((file) => file?.url);
+}
+
 function withDates(id, data) {
   return {
     id,
@@ -109,6 +126,8 @@ function fromClient(id, data) {
     mother_name: data.mother_name || "",
     parent_names: data.parent_names || "",
     phone_numbers: normalizePhoneNumbers(data.phone_numbers),
+    profile_photo: normalizeFileMeta(data.profile_photo),
+    files: normalizeFiles(data.files),
     parent_phone: data.parent_phone || "",
     parent_email: data.parent_email || "",
     city: data.city || "",
@@ -144,6 +163,8 @@ function toClient(data) {
     mother_name: data.mother_name,
     parent_names: data.parent_names,
     phone_numbers: phoneNumbers,
+    profile_photo: normalizeFileMeta(data.profile_photo),
+    files: normalizeFiles(data.files),
     parent_phone: parentPhone,
     parent_email: data.parent_email,
     city: data.city,
@@ -199,6 +220,10 @@ function fromAppointment(id, data) {
     date_time: toIso(data.date_time),
     meeting_type: data.meeting_type || "Evaluation",
     location: data.location || "Office",
+    payment_amount_due: Number(data.payment_amount_due || 0),
+    payment_method: data.payment_method || "",
+    payment_note: data.payment_note || "",
+    card_last4: data.card_last4 || "",
     status: data.status || "Scheduled",
     notes: data.notes || "",
     client_name: data.client_name || "",
@@ -213,6 +238,10 @@ function toAppointment(data) {
     date_time: data.date_time,
     meeting_type: data.meeting_type || "Evaluation",
     location: data.location || "Office",
+    payment_amount_due: Number(data.payment_amount_due || 0),
+    payment_method: data.payment_method,
+    payment_note: data.payment_note,
+    card_last4: String(data.card_last4 || "").replace(/\D/g, "").slice(-4),
     status: data.status || "Scheduled",
     notes: data.notes,
     client_name: data.client_name,
@@ -289,6 +318,7 @@ function toEvaluation(data) {
 function fromBillingRecord(id, data) {
   return {
     ...withDates(id, data),
+    appointment_id: data.appointment_id || "",
     client_id: data.client_id || "",
     client_name: data.client_name || "",
     service_type: data.service_type || "",
@@ -298,12 +328,15 @@ function fromBillingRecord(id, data) {
     invoice_number: data.invoice_number || "",
     paid_date: toIso(data.paid_date),
     payment_method: data.payment_method || "",
+    payment_note: data.payment_note || "",
+    card_last4: data.card_last4 || "",
     notes: data.notes || "",
   };
 }
 
 function toBillingRecord(data) {
   return compact({
+    appointment_id: data.appointment_id,
     client_id: data.client_id,
     client_name: data.client_name,
     service_type: data.service_type,
@@ -313,6 +346,8 @@ function toBillingRecord(data) {
     invoice_number: data.invoice_number,
     paid_date: data.paid_date,
     payment_method: data.payment_method,
+    payment_note: data.payment_note,
+    card_last4: String(data.card_last4 || "").replace(/\D/g, "").slice(-4),
     notes: data.notes,
   });
 }

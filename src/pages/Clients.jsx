@@ -52,10 +52,6 @@ export default function Clients() {
   const { data: clients = [], isLoading } = useQuery({
     queryKey: ["clients"], queryFn: () => firebaseClient.entities.Client.list("-created_date", 1000),
   });
-  const { data: users = [] } = useQuery({
-    queryKey: ["users"], queryFn: () => firebaseClient.entities.User.list("-created_date", 200),
-  });
-  const evaluators = users.filter((u) => u.approval_status === "approved");
 
   const createMutation = useMutation({
     mutationFn: (data) => firebaseClient.entities.Client.create(data),
@@ -179,14 +175,12 @@ export default function Clients() {
       <ClientFormDrawer
         open={showForm}
         onOpenChange={setShowForm}
-        evaluators={evaluators}
         onSave={(data) => createMutation.mutateAsync(data)}
       />
       <ClientFormDrawer
         open={!!editClient}
         onOpenChange={() => setEditClient(null)}
         client={editClient}
-        evaluators={evaluators}
         onSave={(data) => updateMutation.mutateAsync({ id: editClient.id, data })}
       />
     </div>

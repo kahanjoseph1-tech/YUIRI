@@ -120,6 +120,7 @@ export default function Billing() {
                 <TableHead>Service</TableHead>
                 <TableHead>Invoice #</TableHead>
                 <TableHead>Amount</TableHead>
+                <TableHead>Payment</TableHead>
                 <TableHead>Status</TableHead>
                 {canWrite && <TableHead className="text-right">Actions</TableHead>}
               </TableRow>
@@ -131,6 +132,14 @@ export default function Billing() {
                   <TableCell className="text-gray-500">{b.service_type || "—"}</TableCell>
                   <TableCell className="text-gray-500">{b.invoice_number || "—"}</TableCell>
                   <TableCell className="font-semibold text-gray-900">{fmtCurrency(b.amount)}</TableCell>
+                  <TableCell className="text-gray-500">
+                    {b.payment_method ? (
+                      <div>
+                        <p>{b.payment_method}{b.card_last4 ? ` • ${b.card_last4}` : ""}</p>
+                        {b.payment_note && <p className="text-xs text-gray-400 max-w-40 truncate">{b.payment_note}</p>}
+                      </div>
+                    ) : "—"}
+                  </TableCell>
                   <TableCell><StatusBadge status={b.billing_status} /></TableCell>
                   {canWrite && (
                     <TableCell>

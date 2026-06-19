@@ -13,6 +13,7 @@ import {
   getDropdownOptions,
   uniqueOptions,
 } from "@/lib/dropdownSettings";
+import { PAYMENT_METHODS } from "@/lib/constants";
 
 // Converts a stored ISO datetime to a value for <input type="datetime-local">.
 function toLocalInput(iso) {
@@ -28,7 +29,6 @@ export default function AppointmentFormDialog({
   onOpenChange,
   appointment,
   clients = [],
-  evaluators = [],
   defaultClientId,
   defaultDateTime = "",
   defaultLocation = "Office",
@@ -50,40 +50,30 @@ export default function AppointmentFormDialog({
           date_time: toLocalInput(appointment.date_time),
           meeting_type: appointment.meeting_type || "Evaluation",
           location: appointment.location || "Office",
+          payment_amount_due: appointment.payment_amount_due ?? (appointment.meeting_type === "Evaluation" ? 300 : ""),
+          payment_method: appointment.payment_method || "",
+          payment_note: appointment.payment_note || "",
+          card_last4: appointment.card_last4 || "",
         }
       : {
           client_id: defaultClientId || "", evaluator_id: "", evaluator_name: "", date_time: defaultDateTime,
-          meeting_type: "Evaluation", location: defaultLocation || "Office", status: "Scheduled", notes: "",
+          meeting_type: "Evaluation", location: defaultLocation || "Office", status: "Scheduled",
+          payment_amount_due: 300, payment_method: "", payment_note: "", card_last4: "", notes: "",
         });
   }, [open, appointment, defaultClientId, defaultDateTime, defaultLocation]);
 
   const update = (field, value) => setForm((p) => ({ ...p, [field]: value }));
 
   const evaluatorNameOptions = useMemo(
-    () => uniqueOptions([...(dropdownOptions.appointment_evaluators || []), !form.evaluator_id ? form.evaluator_name : ""]),
-    [dropdownOptions.appointment_evaluators, form.evaluator_id, form.evaluator_name]
+    () => uniqueOptions([...(dropdownOptions.appointment_evaluators || []), form.evaluator_name]),
+    [dropdownOptions.appointment_evaluators, form.evaluator_name]
   );
 
-  const evaluatorSelectValue = form.evaluator_id
-    ? `user:${form.evaluator_id}`
-    : form.evaluator_name
-      ? `name:${form.evaluator_name}`
-      : "none";
+  const evaluatorSelectValue = form.evaluator_name ? `name:${form.evaluator_name}` : "none";
 
   const updateEvaluator = (value) => {
     if (value === "none") {
       setForm((current) => ({ ...current, evaluator_id: "", evaluator_name: "" }));
-      return;
-    }
-
-    if (value.startsWith("user:")) {
-      const id = value.slice(5);
-      const evaluator = evaluators.find((user) => user.id === id);
-      setForm((current) => ({
-        ...current,
-        evaluator_id: id,
-        evaluator_name: evaluator ? (evaluator.full_name || evaluator.email) : "",
-      }));
       return;
     }
 
@@ -115,16 +105,18 @@ export default function AppointmentFormDialog({
     setSaving(true);
     try {
       const client = clients.find((c) => c.id === form.client_id);
-      const evaluator = evaluators.find((u) => u.id === form.evaluator_id);
-      const evaluatorName = evaluator ? (evaluator.full_name || evaluator.email) : form.evaluator_name;
       await onSave({
         ...form,
-        evaluator_id: evaluator ? evaluator.id : "",
+        evaluator_id: "",
         date_time: form.date_time ? new Date(form.date_time).toISOString() : null,
         meeting_type: form.meeting_type || "Evaluation",
         location: form.location?.trim() || "Office",
+        payment_amount_due: Number(form.payment_amount_due || 0),
+        payment_method: form.payment_method || "",
+        payment_note: form.payment_note || "",
+        card_last4: String(form.card_last4 || "").replace(/\D/g, "").slice(-4),
         client_name: client ? `${client.boy_first_name} ${client.boy_last_name}` : form.client_name,
-        evaluator_name: evaluatorName || "",
+        evaluator_name: form.evaluator_name || "",
       });
       onOpenChange(false);
     } finally {
@@ -159,11 +151,6 @@ export default function AppointmentFormDialog({
               <SelectTrigger><SelectValue placeholder="Select evaluator" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Unassigned</SelectItem>
-                {evaluators.map((u) => (
-                  <SelectItem key={`user:${u.id}`} value={`user:${u.id}`}>
-                    {u.full_name || u.email}
-                  </SelectItem>
-                ))}
                 {evaluatorNameOptions.map((name) => (
                   <SelectItem key={`name:${name}`} value={`name:${name}`}>{name}</SelectItem>
                 ))}
@@ -177,7 +164,16 @@ export default function AppointmentFormDialog({
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-medium text-gray-500">Type</Label>
-              <Select value={form.meeting_type} onValueChange={(v) => update("meeting_type", v)}>
+              <Select
+                value={form.meeting_type}
+                onValueChange={(v) => {
+                  setForm((current) => ({
+                    ...current,
+                    meeting_type: v,
+                    payment_amount_due: v === "Evaluation" && !current.payment_amount_due ? 300 : current.payment_amount_due,
+                  }));
+                }}
+              >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>{meetingTypeOptions.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
               </Select>
@@ -207,6 +203,49 @@ export default function AppointmentFormDialog({
                 <SelectContent>{appointmentStatusOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
               </Select>
             </div>
+          )}
+          {(form.meeting_type || "Evaluation") === "Evaluation" && (
+          <div className="rounded-lg border border-gray-100 p-3 space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-gray-500">Amount Due</Label>
+                <Input
+                  type="number"
+                  value={form.payment_amount_due ?? ""}
+                  onChange={(e) => update("payment_amount_due", e.target.value)}
+                  placeholder="300"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-gray-500">Payment Method</Label>
+                <Select value={form.payment_method || ""} onValueChange={(v) => update("payment_method", v)}>
+                  <SelectTrigger><SelectValue placeholder="Select method" /></SelectTrigger>
+                  <SelectContent>{PAYMENT_METHODS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+            </div>
+            {form.payment_method === "Credit Card" && (
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-gray-500">Card last 4</Label>
+                <Input
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={form.card_last4 || ""}
+                  onChange={(e) => update("card_last4", e.target.value.replace(/\D/g, "").slice(0, 4))}
+                  placeholder="1234"
+                />
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-gray-500">Payment Note</Label>
+              <Textarea
+                rows={2}
+                value={form.payment_note || ""}
+                onChange={(e) => update("payment_note", e.target.value)}
+                placeholder="Example: family will bring check tomorrow"
+              />
+            </div>
+          </div>
           )}
           <div className="space-y-1.5">
             <Label className="text-xs font-medium text-gray-500">Notes</Label>
