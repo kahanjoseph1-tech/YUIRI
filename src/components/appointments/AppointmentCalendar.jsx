@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths,
-  format, isSameMonth, isSameDay, parseISO,
+  format, isBefore, isSameMonth, isSameDay, parseISO, startOfDay,
 } from "date-fns";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -44,6 +44,7 @@ export default function AppointmentCalendar({
   const monthStart = startOfMonth(cursor);
   const gridStart = startOfWeek(monthStart);
   const gridEnd = endOfWeek(endOfMonth(cursor));
+  const todayStart = startOfDay(new Date());
 
   const days = [];
   for (let d = gridStart; d <= gridEnd; d = addDays(d, 1)) days.push(d);
@@ -87,6 +88,7 @@ export default function AppointmentCalendar({
           const daySlots = slotsOn(day);
           const inMonth = isSameMonth(day, cursor);
           const today = isSameDay(day, new Date());
+          const isPastDay = isBefore(day, todayStart);
           const parsha = day.getDay() === 6 ? weeklyParsha(day) : "";
           return (
             <div
@@ -97,24 +99,30 @@ export default function AppointmentCalendar({
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") onDaySelect?.(day);
               }}
-              className={`min-h-[104px] rounded-lg border p-1.5 text-left transition ${inMonth ? "bg-white border-gray-100 hover:border-blue-200 hover:bg-blue-50/30" : "bg-gray-50/50 border-transparent hover:bg-gray-50"} ${onDaySelect ? "cursor-pointer" : ""}`}
+              className={`min-h-[104px] rounded-lg border p-1.5 text-left transition ${
+                isPastDay
+                  ? "bg-gray-100/80 border-gray-100 hover:bg-gray-100"
+                  : inMonth
+                    ? "bg-white border-gray-100 hover:border-blue-200 hover:bg-blue-50/30"
+                    : "bg-gray-50/50 border-transparent hover:bg-gray-50"
+              } ${onDaySelect ? "cursor-pointer" : ""}`}
             >
               <div className="mb-1 flex items-start justify-between gap-1">
                 <div>
-                  <div className={`text-xs ${today ? "font-bold text-blue-600" : inMonth ? "text-gray-600" : "text-gray-300"}`}>
+                  <div className={`text-xs ${today ? "font-bold text-blue-600" : isPastDay ? "text-gray-400" : inMonth ? "text-gray-600" : "text-gray-300"}`}>
                     {format(day, "d")}
                   </div>
-                  <div className={`max-w-full truncate text-[10px] leading-tight ${inMonth ? "text-gray-400" : "text-gray-300"}`}>
+                  <div className={`max-w-full truncate text-[10px] leading-tight ${isPastDay ? "text-gray-300" : inMonth ? "text-gray-400" : "text-gray-300"}`}>
                     {yiddishDate(day)}
                   </div>
                   {parsha && (
-                    <div className={`mt-0.5 max-w-full truncate text-[10px] leading-tight ${inMonth ? "text-[#1e3a5f]" : "text-gray-300"}`}>
+                    <div className={`mt-0.5 max-w-full truncate text-[10px] leading-tight ${isPastDay ? "text-gray-400" : inMonth ? "text-[#1e3a5f]" : "text-gray-300"}`}>
                       {parsha}
                     </div>
                   )}
                 </div>
                 {daySlots.length > 0 && (
-                  <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-medium text-emerald-700">
+                  <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-medium ${isPastDay ? "bg-gray-200 text-gray-500" : "bg-emerald-50 text-emerald-700"}`}>
                     {daySlots.length} slot{daySlots.length === 1 ? "" : "s"}
                   </span>
                 )}
@@ -127,7 +135,7 @@ export default function AppointmentCalendar({
                       event.stopPropagation();
                       onSelect?.(a);
                     }}
-                    className="w-full flex items-center gap-1 text-[10px] text-gray-600 hover:bg-gray-50 rounded px-1 py-0.5 truncate"
+                    className={`w-full flex items-center gap-1 text-[10px] hover:bg-gray-50 rounded px-1 py-0.5 truncate ${isPastDay ? "text-gray-400" : "text-gray-600"}`}
                   >
                     <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${DOT[toneFor(a.status)]}`} />
                     <span className="truncate">{format(parseISO(a.date_time), "h:mma")} {a.client_name}</span>

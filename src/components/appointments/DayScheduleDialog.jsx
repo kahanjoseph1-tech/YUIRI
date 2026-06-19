@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { format, isSameDay, parseISO } from "date-fns";
+import { format, isBefore, isSameDay, parseISO, startOfDay } from "date-fns";
 import { CalendarPlus, Clock, MapPin, Pencil, RotateCcw, UserRound, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -92,7 +92,9 @@ export default function DayScheduleDialog({
 
   const dayName = DAY_NAMES[day.getDay()];
   const parsha = weeklyParsha(day);
+  const isPastDay = isBefore(day, startOfDay(new Date()));
   const openNewAppointment = (time = "09:00", location = "Office", evaluatorName = "") => {
+    if (isPastDay) return;
     onSchedule?.({
       date_time: localDateTimeValue(day, time),
       location: location || "Office",
@@ -120,12 +122,18 @@ export default function DayScheduleDialog({
           <section>
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-semibold text-gray-900">Available Slots</h3>
-              {canWrite && (
+              {canWrite && !isPastDay && (
                 <Button type="button" size="sm" variant="outline" className="gap-1.5" onClick={() => openNewAppointment()}>
                   <CalendarPlus className="h-4 w-4" /> New
                 </Button>
               )}
             </div>
+
+            {isPastDay && (
+              <div className="mb-3 rounded-lg border border-gray-100 bg-gray-50 p-3 text-sm text-gray-500">
+                Past date. Old records are still available, but new scheduling is disabled.
+              </div>
+            )}
 
             {daySlots.length === 0 ? (
               <div className="rounded-lg border border-dashed border-gray-200 p-4 text-sm text-gray-400">
@@ -168,11 +176,12 @@ export default function DayScheduleDialog({
                         <Button
                           type="button"
                           size="sm"
-                          variant={booked ? "outline" : "default"}
-                          className={booked ? "" : "bg-[#1e3a5f] hover:bg-[#1e3a5f]/90"}
+                          variant={booked || isPastDay ? "outline" : "default"}
+                          className={booked || isPastDay ? "" : "bg-[#1e3a5f] hover:bg-[#1e3a5f]/90"}
                           onClick={() => openNewAppointment(slot.time, slot.location, slot.evaluator_name)}
+                          disabled={isPastDay}
                         >
-                          {booked ? "Override" : "Schedule"}
+                          {isPastDay ? "Past date" : booked ? "Override" : "Schedule"}
                         </Button>
                       )}
                     </div>

@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client'
 import App from '@/App.jsx'
 import '@/index.css'
 
-const buildVersion = 'due-evaluations-safe-card-2026-06-19-1'
+const buildVersion = 'past-calendar-no-backdate-2026-06-19-1'
 
 window.__YUIRI_BUILD_VERSION__ = buildVersion
 

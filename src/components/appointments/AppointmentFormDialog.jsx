@@ -25,6 +25,20 @@ function toLocalInput(iso) {
   return new Date(d.getTime() - tz).toISOString().slice(0, 16);
 }
 
+function localDateKey(value) {
+  if (!value) return "";
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10);
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function startOfTodayInput() {
+  return `${localDateKey(new Date())}T00:00`;
+}
+
 export default function AppointmentFormDialog({
   open,
   onOpenChange,
@@ -171,6 +185,8 @@ export default function AppointmentFormDialog({
     value: c.id, label: `${c.boy_first_name} ${c.boy_last_name}`,
   }));
 
+  const isBackdatedNewAppointment = !appointment && form.date_time && localDateKey(form.date_time) < localDateKey(new Date());
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
@@ -203,7 +219,15 @@ export default function AppointmentFormDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label className="text-xs font-medium text-gray-500">Date & Time *</Label>
-              <Input type="datetime-local" value={form.date_time || ""} onChange={(e) => update("date_time", e.target.value)} />
+              <Input
+                type="datetime-local"
+                min={!appointment ? startOfTodayInput() : undefined}
+                value={form.date_time || ""}
+                onChange={(e) => update("date_time", e.target.value)}
+              />
+              {isBackdatedNewAppointment && (
+                <p className="text-xs text-red-600">New appointments cannot be scheduled before today.</p>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-medium text-gray-500">Type</Label>
@@ -320,7 +344,7 @@ export default function AppointmentFormDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSave} disabled={saving || !form.client_id || !form.date_time} className="bg-[#1e3a5f] hover:bg-[#1e3a5f]/90">
+          <Button onClick={handleSave} disabled={saving || !form.client_id || !form.date_time || isBackdatedNewAppointment} className="bg-[#1e3a5f] hover:bg-[#1e3a5f]/90">
             {saving ? "Saving..." : appointment ? "Update" : "Create"}
           </Button>
         </DialogFooter>
