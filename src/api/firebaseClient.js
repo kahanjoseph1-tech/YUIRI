@@ -35,6 +35,11 @@ function compact(value) {
   );
 }
 
+function normalizePlainObject(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value) || value instanceof Date) return {};
+  return compact(value);
+}
+
 function toIso(value) {
   if (!value) return value;
   if (typeof value === "string") return value;
@@ -299,6 +304,9 @@ function fromEvaluation(id, data) {
     suggested_schools: data.suggested_schools || "",
     urgency: data.urgency || "Medium",
     final_recommendation: data.final_recommendation || "",
+    questionnaire: normalizePlainObject(data.questionnaire),
+    evaluation_billing_answer: data.evaluation_billing_answer || "",
+    evaluation_billing_note: data.evaluation_billing_note || "",
     status: data.status || "Pending",
   };
 }
@@ -321,6 +329,9 @@ function toEvaluation(data) {
     suggested_schools: data.suggested_schools,
     urgency: data.urgency || "Medium",
     final_recommendation: data.final_recommendation,
+    questionnaire: normalizePlainObject(data.questionnaire),
+    evaluation_billing_answer: data.evaluation_billing_answer,
+    evaluation_billing_note: data.evaluation_billing_note,
     status: data.status || "Pending",
   });
 }
@@ -340,6 +351,8 @@ function fromBillingRecord(id, data) {
     payment_method: data.payment_method || "",
     payment_note: data.payment_note || "",
     card_last4: data.card_last4 || "",
+    evaluation_billing_answer: data.evaluation_billing_answer || "",
+    evaluation_billing_note: data.evaluation_billing_note || "",
     notes: data.notes || "",
   };
 }
@@ -358,6 +371,8 @@ function toBillingRecord(data) {
     payment_method: data.payment_method,
     payment_note: data.payment_note,
     card_last4: String(data.card_last4 || "").replace(/\D/g, "").slice(-4),
+    evaluation_billing_answer: data.evaluation_billing_answer,
+    evaluation_billing_note: data.evaluation_billing_note,
     notes: data.notes,
   });
 }

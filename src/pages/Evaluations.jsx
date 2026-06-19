@@ -72,7 +72,7 @@ export default function Evaluations() {
     mutationFn: async ({ id, data, nextStatus, prev }) => {
       const payload = { ...data, status: nextStatus };
       const updated = await firebaseClient.entities.Evaluation.update(id, payload);
-      if (nextStatus === "Completed" && prev?.status !== "Completed") {
+      if (nextStatus === "Completed") {
         await onEvaluationCompleted({ ...prev, ...payload, id });
       }
       return updated;

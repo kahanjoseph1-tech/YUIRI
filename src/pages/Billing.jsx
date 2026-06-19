@@ -133,10 +133,18 @@ export default function Billing() {
                   <TableCell className="text-gray-500">{b.invoice_number || "—"}</TableCell>
                   <TableCell className="font-semibold text-gray-900">{fmtCurrency(b.amount)}</TableCell>
                   <TableCell className="text-gray-500">
-                    {b.payment_method ? (
+                    {b.payment_method || b.payment_note || b.evaluation_billing_answer || b.evaluation_billing_note ? (
                       <div>
-                        <p>{b.payment_method}{b.card_last4 ? ` • ${b.card_last4}` : ""}</p>
+                        {b.payment_method && <p>{b.payment_method}{b.card_last4 ? ` • ${b.card_last4}` : ""}</p>}
                         {b.payment_note && <p className="text-xs text-gray-400 max-w-40 truncate">{b.payment_note}</p>}
+                        {b.evaluation_billing_answer && (
+                          <p className="text-xs font-medium text-amber-700 max-w-48 truncate">
+                            Evaluation: {b.evaluation_billing_answer}
+                          </p>
+                        )}
+                        {b.evaluation_billing_note && (
+                          <p className="text-xs text-gray-400 max-w-48 truncate">{b.evaluation_billing_note}</p>
+                        )}
                       </div>
                     ) : "—"}
                   </TableCell>

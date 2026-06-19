@@ -18,6 +18,13 @@ async function getById(entity, id) {
   }
 }
 
+function evaluationBillingDetails(evaluation) {
+  return {
+    evaluation_billing_answer: evaluation?.evaluation_billing_answer || "",
+    evaluation_billing_note: evaluation?.evaluation_billing_note || "",
+  };
+}
+
 export async function ensureEvaluationBillingForAppointment(appointment) {
   if (!appointment || (appointment.meeting_type || "Evaluation") !== "Evaluation") return null;
 
@@ -148,13 +155,16 @@ export async function onEvaluationCompleted(evaluation) {
 
   try {
     const billing = await firebaseClient.entities.BillingRecord.list("-created_date", 1000);
-    const alreadyBilled = billing.some((record) =>
+    const existing = billing.find((record) =>
       (evaluation.appointment_id && record.appointment_id === evaluation.appointment_id) ||
       (record.client_id === evaluation.client_id &&
         record.service_type === "Evaluation" &&
         (!appointmentDate || record.appointment_date === appointmentDate))
     );
-    if (alreadyBilled) return;
+    if (existing) {
+      await firebaseClient.entities.BillingRecord.update(existing.id, evaluationBillingDetails(evaluation));
+      return;
+    }
   } catch {
     // If the duplicate check fails, continue with the fallback billing record.
   }
@@ -170,6 +180,7 @@ export async function onEvaluationCompleted(evaluation) {
     payment_method: appointment?.payment_method || "",
     payment_note: appointment?.payment_note || "",
     card_last4: appointment?.card_last4 || "",
+    ...evaluationBillingDetails(evaluation),
     notes: appointment?.payment_note || "",
   });
 }
