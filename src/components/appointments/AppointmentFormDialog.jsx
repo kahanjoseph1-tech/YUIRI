@@ -52,12 +52,49 @@ export default function AppointmentFormDialog({
           location: appointment.location || "Office",
         }
       : {
-          client_id: defaultClientId || "", evaluator_id: "", date_time: defaultDateTime,
+          client_id: defaultClientId || "", evaluator_id: "", evaluator_name: "", date_time: defaultDateTime,
           meeting_type: "Evaluation", location: defaultLocation || "Office", status: "Scheduled", notes: "",
         });
   }, [open, appointment, defaultClientId, defaultDateTime, defaultLocation]);
 
   const update = (field, value) => setForm((p) => ({ ...p, [field]: value }));
+
+  const evaluatorNameOptions = useMemo(
+    () => uniqueOptions([...(dropdownOptions.appointment_evaluators || []), !form.evaluator_id ? form.evaluator_name : ""]),
+    [dropdownOptions.appointment_evaluators, form.evaluator_id, form.evaluator_name]
+  );
+
+  const evaluatorSelectValue = form.evaluator_id
+    ? `user:${form.evaluator_id}`
+    : form.evaluator_name
+      ? `name:${form.evaluator_name}`
+      : "none";
+
+  const updateEvaluator = (value) => {
+    if (value === "none") {
+      setForm((current) => ({ ...current, evaluator_id: "", evaluator_name: "" }));
+      return;
+    }
+
+    if (value.startsWith("user:")) {
+      const id = value.slice(5);
+      const evaluator = evaluators.find((user) => user.id === id);
+      setForm((current) => ({
+        ...current,
+        evaluator_id: id,
+        evaluator_name: evaluator ? (evaluator.full_name || evaluator.email) : "",
+      }));
+      return;
+    }
+
+    if (value.startsWith("name:")) {
+      setForm((current) => ({
+        ...current,
+        evaluator_id: "",
+        evaluator_name: value.slice(5),
+      }));
+    }
+  };
 
   const meetingTypeOptions = useMemo(
     () => uniqueOptions([...(dropdownOptions.meeting_types || []), form.meeting_type]),
@@ -79,13 +116,15 @@ export default function AppointmentFormDialog({
     try {
       const client = clients.find((c) => c.id === form.client_id);
       const evaluator = evaluators.find((u) => u.id === form.evaluator_id);
+      const evaluatorName = evaluator ? (evaluator.full_name || evaluator.email) : form.evaluator_name;
       await onSave({
         ...form,
+        evaluator_id: evaluator ? evaluator.id : "",
         date_time: form.date_time ? new Date(form.date_time).toISOString() : null,
         meeting_type: form.meeting_type || "Evaluation",
         location: form.location?.trim() || "Office",
         client_name: client ? `${client.boy_first_name} ${client.boy_last_name}` : form.client_name,
-        evaluator_name: evaluator ? (evaluator.full_name || evaluator.email) : form.evaluator_name,
+        evaluator_name: evaluatorName || "",
       });
       onOpenChange(false);
     } finally {
@@ -116,11 +155,18 @@ export default function AppointmentFormDialog({
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs font-medium text-gray-500">Evaluator</Label>
-            <Select value={form.evaluator_id || "none"} onValueChange={(v) => update("evaluator_id", v === "none" ? "" : v)}>
+            <Select value={evaluatorSelectValue} onValueChange={updateEvaluator}>
               <SelectTrigger><SelectValue placeholder="Select evaluator" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Unassigned</SelectItem>
-                {evaluators.map((u) => <SelectItem key={u.id} value={u.id}>{u.full_name || u.email}</SelectItem>)}
+                {evaluators.map((u) => (
+                  <SelectItem key={`user:${u.id}`} value={`user:${u.id}`}>
+                    {u.full_name || u.email}
+                  </SelectItem>
+                ))}
+                {evaluatorNameOptions.map((name) => (
+                  <SelectItem key={`name:${name}`} value={`name:${name}`}>{name}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

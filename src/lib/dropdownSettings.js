@@ -31,6 +31,7 @@ export const DROPDOWN_SECTIONS = [
     key: "scheduling",
     label: "Scheduling",
     groupKeys: [
+      "appointment_evaluators",
       "meeting_types",
       "appointment_statuses",
       "appointment_locations",
@@ -45,6 +46,7 @@ export const DROPDOWN_GROUPS = [
   { key: "shiur_options", label: "שיעור", section: "clients" },
   { key: "client_statuses", label: "Status", section: "clients" },
   { key: "phone_number_tags", label: "Phone number tags", section: "clients" },
+  { key: "appointment_evaluators", label: "Evaluator", section: "scheduling" },
   { key: "meeting_types", label: "Appointment type", section: "scheduling" },
   { key: "appointment_statuses", label: "Appointment status", section: "scheduling" },
   { key: "appointment_locations", label: "Location presets", section: "scheduling" },
@@ -57,6 +59,7 @@ export const DEFAULT_DROPDOWN_OPTIONS = {
   shiur_options: [],
   client_statuses: CLIENT_STATUSES,
   phone_number_tags: PHONE_NUMBER_TAGS,
+  appointment_evaluators: [],
   meeting_types: MEETING_TYPES,
   appointment_statuses: APPOINTMENT_STATUSES,
   appointment_locations: ["Office"],
