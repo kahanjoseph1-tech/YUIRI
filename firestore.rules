@@ -68,6 +68,11 @@ service cloud.firestore {
       allow delete: if currentUserIsAdmin();
     }
 
+    match /settings/{document} {
+      allow read: if currentUserIsApproved();
+      allow write: if currentUserIsAdmin();
+    }
+
     match /clients/{document} {
       allow read, write: if currentUserIsApproved();
     }

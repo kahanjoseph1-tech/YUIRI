@@ -16,6 +16,7 @@ import Placements from './pages/Placements';
 import Billing from './pages/Billing';
 import Reports from './pages/Reports';
 import Users from './pages/Users';
+import Settings from './pages/Settings';
 import __Layout from './Layout.jsx';
 
 
@@ -30,6 +31,7 @@ export const PAGES = {
     "Billing": Billing,
     "Reports": Reports,
     "Users": Users,
+    "Settings": Settings,
 }
 
 export const pagesConfig = {

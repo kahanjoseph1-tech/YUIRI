@@ -153,8 +153,10 @@ export default function ClientDetail() {
           <Info icon={Mail} label="Email address" value={client.parent_email} />
           <Info icon={MapPin} label="City" value={client.city} />
           <Info icon={GraduationCap} label="לערנט בישיבה" value={client.current_school} />
+          <Info icon={GraduationCap} label="שיעור" value={client.shiur} />
           <Info icon={Phone} label="טאטע'ס נאמען" value={client.father_name} />
           <Info icon={Phone} label="ווער רופט" value={client.caller_source || client.referral_source} />
+          <Info icon={FileText} label="סיבה" value={client.reason} />
           <Info icon={Phone} label="Responsible" value={client.responsible_person} />
           <Info icon={Phone} label="Mother" value={client.mother_name} />
         </div>

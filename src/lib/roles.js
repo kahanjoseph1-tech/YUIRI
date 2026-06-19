@@ -14,7 +14,7 @@ const CRM_PAGES = [
 ];
 
 const PAGE_ACCESS = {
-  admin: [...CRM_PAGES, "Users"],
+  admin: [...CRM_PAGES, "Users", "Settings"],
   user: CRM_PAGES,
 };
 
@@ -51,7 +51,8 @@ export const NAV_ITEMS = [
   { key: "Placements", label: "Placements", icon: "ArrowRightLeft" },
   { key: "Billing", label: "Billing", icon: "DollarSign" },
   { key: "Reports", label: "Reports", icon: "BarChart3" },
-  { key: "Users", label: "Users", icon: "Settings" },
+  { key: "Users", label: "Users", icon: "Users" },
+  { key: "Settings", label: "Settings", icon: "Settings" },
 ];
 
 export function navItemsForRole(role) {

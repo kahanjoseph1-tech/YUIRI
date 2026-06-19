@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Plus, Trash2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,55 +8,22 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  CLIENT_STATUSES,
-  DEFAULT_CALLER_OPTIONS,
-  DEFAULT_RESPONSIBLE_OPTIONS,
-  PHONE_NUMBER_TAGS,
-} from "@/lib/constants";
-
-const CALLER_OPTIONS_KEY = "yuiri_caller_options_v1";
-const RESPONSIBLE_OPTIONS_KEY = "yuiri_responsible_options_v1";
+  DEFAULT_DROPDOWN_OPTIONS,
+  DROPDOWN_OPTIONS_QUERY_KEY,
+  getDropdownOptions,
+  uniqueOptions,
+} from "@/lib/dropdownSettings";
 
 const EMPTY = {
   boy_first_name: "", boy_last_name: "", age: "",
   father_name: "", parent_phone: "", parent_email: "",
-  city: "", current_school: "", caller_source: "", referral_source: "",
+  city: "", current_school: "", shiur: "", reason: "", caller_source: "", referral_source: "",
   responsible_person: "",
   family_expectations: "", notes: "", status: "New Client",
   assigned_evaluator_id: "", special_needs: [],
 };
 
 const emptyPhoneRow = () => ({ tag: "Father's Cell", custom_label: "", number: "" });
-
-function readCallerOptions() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(CALLER_OPTIONS_KEY) || "[]");
-    return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
-  } catch {
-    return [];
-  }
-}
-
-function readResponsibleOptions() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(RESPONSIBLE_OPTIONS_KEY) || "[]");
-    return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveCallerOptions(options) {
-  localStorage.setItem(CALLER_OPTIONS_KEY, JSON.stringify(options));
-}
-
-function saveResponsibleOptions(options) {
-  localStorage.setItem(RESPONSIBLE_OPTIONS_KEY, JSON.stringify(options));
-}
-
-function uniqueOptions(options) {
-  return Array.from(new Set(options.map((option) => String(option || "").trim()).filter(Boolean)));
-}
 
 function phoneRowsFromClient(client) {
   if (Array.isArray(client?.phone_numbers) && client.phone_numbers.length > 0) {
@@ -86,9 +54,12 @@ export default function ClientFormDrawer({ open, onOpenChange, client, evaluator
   const [form, setForm] = useState(EMPTY);
   const [phoneRows, setPhoneRows] = useState([emptyPhoneRow()]);
   const [needsText, setNeedsText] = useState("");
-  const [customCallerOptions, setCustomCallerOptions] = useState(readCallerOptions);
-  const [customResponsibleOptions, setCustomResponsibleOptions] = useState(readResponsibleOptions);
   const [saving, setSaving] = useState(false);
+
+  const { data: dropdownOptions = DEFAULT_DROPDOWN_OPTIONS } = useQuery({
+    queryKey: DROPDOWN_OPTIONS_QUERY_KEY,
+    queryFn: getDropdownOptions,
+  });
 
   useEffect(() => {
     if (open) {
@@ -110,20 +81,37 @@ export default function ClientFormDrawer({ open, onOpenChange, client, evaluator
   }, [open, client, evaluators]);
 
   const callerOptions = useMemo(
-    () => uniqueOptions([...DEFAULT_CALLER_OPTIONS, ...customCallerOptions, form.caller_source]),
-    [customCallerOptions, form.caller_source]
+    () => uniqueOptions([...(dropdownOptions.caller_options || []), form.caller_source]),
+    [dropdownOptions.caller_options, form.caller_source]
   );
 
   const responsibleOptions = useMemo(() => {
-    const evaluatorNames = evaluators.map((u) => u.full_name || u.email).filter(Boolean);
     return uniqueOptions([
-      ...DEFAULT_RESPONSIBLE_OPTIONS,
+      ...(dropdownOptions.responsible_options || []),
       form.father_name,
-      ...evaluatorNames,
-      ...customResponsibleOptions,
       form.responsible_person,
     ]);
-  }, [customResponsibleOptions, evaluators, form.father_name, form.responsible_person]);
+  }, [dropdownOptions.responsible_options, form.father_name, form.responsible_person]);
+
+  const statusOptions = useMemo(
+    () => uniqueOptions([...(dropdownOptions.client_statuses || []), form.status]),
+    [dropdownOptions.client_statuses, form.status]
+  );
+
+  const phoneTagOptions = useMemo(
+    () => uniqueOptions(dropdownOptions.phone_number_tags || []),
+    [dropdownOptions.phone_number_tags]
+  );
+
+  const reasonOptions = useMemo(
+    () => uniqueOptions([...(dropdownOptions.reason_options || []), form.reason]),
+    [dropdownOptions.reason_options, form.reason]
+  );
+
+  const shiurOptions = useMemo(
+    () => uniqueOptions([...(dropdownOptions.shiur_options || []), form.shiur]),
+    [dropdownOptions.shiur_options, form.shiur]
+  );
 
   const update = (field, value) => setForm((p) => ({ ...p, [field]: value }));
 
@@ -138,28 +126,6 @@ export default function ClientFormDrawer({ open, onOpenChange, client, evaluator
       const nextRows = rows.filter((_, rowIndex) => rowIndex !== index);
       return nextRows.length > 0 ? nextRows : [emptyPhoneRow()];
     });
-  };
-
-  const addCallerOption = () => {
-    const value = window.prompt("Add an option for ווער רופט");
-    const cleanedValue = String(value || "").trim();
-    if (!cleanedValue) return;
-
-    const nextOptions = uniqueOptions([...customCallerOptions, cleanedValue]);
-    setCustomCallerOptions(nextOptions);
-    saveCallerOptions(nextOptions);
-    update("caller_source", cleanedValue);
-  };
-
-  const addResponsibleOption = () => {
-    const value = window.prompt("Add responsible name");
-    const cleanedValue = String(value || "").trim();
-    if (!cleanedValue) return;
-
-    const nextOptions = uniqueOptions([...customResponsibleOptions, cleanedValue]);
-    setCustomResponsibleOptions(nextOptions);
-    saveResponsibleOptions(nextOptions);
-    update("responsible_person", cleanedValue);
   };
 
   const handleSave = async () => {
@@ -239,7 +205,7 @@ export default function ClientFormDrawer({ open, onOpenChange, client, evaluator
                   <Select value={phone.tag || "Father's Cell"} onValueChange={(value) => updatePhoneRow(index, "tag", value)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {PHONE_NUMBER_TAGS.map((tag) => <SelectItem key={tag} value={tag}>{tag}</SelectItem>)}
+                      {phoneTagOptions.map((tag) => <SelectItem key={tag} value={tag}>{tag}</SelectItem>)}
                     </SelectContent>
                   </Select>
                   <div className="grid grid-cols-1 gap-2">
@@ -281,50 +247,64 @@ export default function ClientFormDrawer({ open, onOpenChange, client, evaluator
             </div>
           </Field>
 
-          <Field label="Email address">
+          <Field label="Email address" full>
             <Input type="email" value={form.parent_email} onChange={(e) => update("parent_email", e.target.value)} />
           </Field>
           <Field label="לערנט בישיבה">
             <Input value={form.current_school} onChange={(e) => update("current_school", e.target.value)} />
           </Field>
+          <Field label="שיעור">
+            <Select
+              value={form.shiur || "none"}
+              onValueChange={(v) => update("shiur", v === "none" ? "" : v)}
+            >
+              <SelectTrigger><SelectValue placeholder="Select option" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                {shiurOptions.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </Field>
           <Field label="City">
             <Input value={form.city} onChange={(e) => update("city", e.target.value)} />
           </Field>
           <Field label="ווער רופט">
-            <div className="flex gap-2">
-              <Select value={form.caller_source || ""} onValueChange={(v) => update("caller_source", v)}>
-                <SelectTrigger><SelectValue placeholder="Select option" /></SelectTrigger>
-                <SelectContent>
-                  {callerOptions.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Button type="button" variant="outline" size="icon" className="h-10 w-10 shrink-0" onClick={addCallerOption}>
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
+            <Select value={form.caller_source || ""} onValueChange={(v) => update("caller_source", v)}>
+              <SelectTrigger><SelectValue placeholder="Select option" /></SelectTrigger>
+              <SelectContent>
+                {callerOptions.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="סיבה">
+            <Select
+              value={form.reason || "none"}
+              onValueChange={(v) => update("reason", v === "none" ? "" : v)}
+            >
+              <SelectTrigger><SelectValue placeholder="Select option" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                {reasonOptions.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </Field>
           <Field label="Status">
             <Select value={form.status} onValueChange={(v) => update("status", v)}>
               <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
-              <SelectContent>{CLIENT_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+              <SelectContent>{statusOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
             </Select>
           </Field>
           <Field label="Responsible">
-            <div className="flex gap-2">
-              <Select
-                value={form.responsible_person || "none"}
-                onValueChange={(v) => update("responsible_person", v === "none" ? "" : v)}
-              >
-                <SelectTrigger><SelectValue placeholder="Unassigned" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Unassigned</SelectItem>
-                  {responsibleOptions.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Button type="button" variant="outline" size="icon" className="h-10 w-10 shrink-0" onClick={addResponsibleOption}>
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
+            <Select
+              value={form.responsible_person || "none"}
+              onValueChange={(v) => update("responsible_person", v === "none" ? "" : v)}
+            >
+              <SelectTrigger><SelectValue placeholder="Unassigned" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Unassigned</SelectItem>
+                {responsibleOptions.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </Field>
           <Field label="Special Needs (comma separated)" full>
             <Input value={needsText} onChange={(e) => setNeedsText(e.target.value)} placeholder="ADHD, Speech, Dyslexia..." />
