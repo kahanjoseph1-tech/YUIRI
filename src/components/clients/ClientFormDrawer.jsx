@@ -5,14 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-  GRADE_LEVELS, CLIENT_STATUSES, REFERRAL_SOURCES, RELIGIOUS_LEVELS,
-} from "@/lib/constants";
+import { CLIENT_STATUSES } from "@/lib/constants";
 
 const EMPTY = {
-  boy_first_name: "", boy_last_name: "", age: "", grade_level: "",
-  father_name: "", mother_name: "", parent_phone: "", parent_email: "",
-  city: "", current_school: "", referral_source: "", religious_level: "",
+  boy_first_name: "", boy_last_name: "", age: "",
+  father_name: "", parent_phone: "", parent_email: "",
+  city: "", current_school: "", referral_source: "",
   family_expectations: "", notes: "", status: "New Lead",
   assigned_evaluator_id: "", special_needs: [],
 };
@@ -71,17 +69,8 @@ export default function ClientFormDrawer({ open, onOpenChange, client, evaluator
           <Field label="Age">
             <Input type="number" value={form.age} onChange={(e) => update("age", e.target.value)} />
           </Field>
-          <Field label="Grade Level">
-            <Select value={form.grade_level} onValueChange={(v) => update("grade_level", v)}>
-              <SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger>
-              <SelectContent>{GRADE_LEVELS.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent>
-            </Select>
-          </Field>
           <Field label="Father's Name">
             <Input value={form.father_name} onChange={(e) => update("father_name", e.target.value)} />
-          </Field>
-          <Field label="Mother's Name">
-            <Input value={form.mother_name} onChange={(e) => update("mother_name", e.target.value)} />
           </Field>
           <Field label="Parent Phone">
             <Input value={form.parent_phone} onChange={(e) => update("parent_phone", e.target.value)} />
@@ -96,16 +85,11 @@ export default function ClientFormDrawer({ open, onOpenChange, client, evaluator
             <Input value={form.current_school} onChange={(e) => update("current_school", e.target.value)} />
           </Field>
           <Field label="Referral Source">
-            <Select value={form.referral_source} onValueChange={(v) => update("referral_source", v)}>
-              <SelectTrigger><SelectValue placeholder="Select source" /></SelectTrigger>
-              <SelectContent>{REFERRAL_SOURCES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-            </Select>
-          </Field>
-          <Field label="Religious Level">
-            <Select value={form.religious_level} onValueChange={(v) => update("religious_level", v)}>
-              <SelectTrigger><SelectValue placeholder="Select level" /></SelectTrigger>
-              <SelectContent>{RELIGIOUS_LEVELS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-            </Select>
+            <Input
+              value={form.referral_source}
+              onChange={(e) => update("referral_source", e.target.value)}
+              placeholder="Referral source"
+            />
           </Field>
           <Field label="Status">
             <Select value={form.status} onValueChange={(v) => update("status", v)}>

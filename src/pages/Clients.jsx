@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Search, ArrowUpDown, Users } from "lucide-react";
 import StatusBadge from "@/components/StatusBadge";
 import ClientFormDrawer from "@/components/clients/ClientFormDrawer";
-import { CLIENT_STATUSES, RELIGIOUS_LEVELS } from "@/lib/constants";
+import { CLIENT_STATUSES } from "@/lib/constants";
 import { getEffectiveRole, can } from "@/lib/roles";
 import { useRole } from "@/lib/useRole";
 
@@ -27,8 +27,6 @@ export default function Clients() {
 
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState(params.get("status") || "all");
-  const [religious, setReligious] = useState("all");
-  const [city, setCity] = useState("all");
   const [readyOnly] = useState(params.get("ready") === "1");
   const [sort, setSort] = useState({ key: "boy_last_name", dir: "asc" });
   const [page, setPage] = useState(1);
@@ -54,18 +52,11 @@ export default function Clients() {
     onError: () => toast.error("Failed to update client"),
   });
 
-  const cities = useMemo(
-    () => Array.from(new Set(clients.map((c) => c.city).filter(Boolean))).sort(),
-    [clients]
-  );
-
   const filtered = useMemo(() => {
     let rows = clients.filter((c) => {
       const name = `${c.boy_first_name || ""} ${c.boy_last_name || ""} ${c.father_name || ""} ${c.mother_name || ""}`.toLowerCase();
       if (search && !name.includes(search.toLowerCase())) return false;
       if (status !== "all" && c.status !== status) return false;
-      if (religious !== "all" && c.religious_level !== religious) return false;
-      if (city !== "all" && c.city !== city) return false;
       if (readyOnly && !c.ready_to_bill) return false;
       return true;
     });
@@ -77,7 +68,7 @@ export default function Clients() {
       return 0;
     });
     return rows;
-  }, [clients, search, status, religious, city, readyOnly, sort]);
+  }, [clients, search, status, readyOnly, sort]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageRows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -106,7 +97,7 @@ export default function Clients() {
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-100">
-        <div className="p-4 border-b border-gray-50 grid grid-cols-1 sm:grid-cols-4 gap-3">
+        <div className="p-4 border-b border-gray-50 grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="relative sm:col-span-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <Input placeholder="Search name..." className="pl-9" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
@@ -116,20 +107,6 @@ export default function Clients() {
             <SelectContent>
               <SelectItem value="all">All Statuses</SelectItem>
               {CLIENT_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={religious} onValueChange={(v) => { setReligious(v); setPage(1); }}>
-            <SelectTrigger><SelectValue placeholder="Religious Level" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Levels</SelectItem>
-              {RELIGIOUS_LEVELS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={city} onValueChange={(v) => { setCity(v); setPage(1); }}>
-            <SelectTrigger><SelectValue placeholder="City" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Cities</SelectItem>
-              {cities.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
@@ -146,9 +123,7 @@ export default function Clients() {
             <TableHeader>
               <TableRow>
                 <SortHead k="boy_last_name">Name</SortHead>
-                <TableHead>Grade</TableHead>
                 <SortHead k="city">City</SortHead>
-                <TableHead>Religious Level</TableHead>
                 <TableHead>Parent Phone</TableHead>
                 <SortHead k="status">Status</SortHead>
               </TableRow>
@@ -157,9 +132,7 @@ export default function Clients() {
               {pageRows.map((c) => (
                 <TableRow key={c.id} className="cursor-pointer" onClick={() => navigate(`${createPageUrl("ClientDetail")}?id=${c.id}`)}>
                   <TableCell className="font-medium text-gray-900">{c.boy_first_name} {c.boy_last_name}</TableCell>
-                  <TableCell className="text-gray-500">{c.grade_level || "—"}</TableCell>
                   <TableCell className="text-gray-500">{c.city || "—"}</TableCell>
-                  <TableCell className="text-gray-500">{c.religious_level || "—"}</TableCell>
                   <TableCell className="text-gray-500">{c.parent_phone || "—"}</TableCell>
                   <TableCell><StatusBadge status={c.status} /></TableCell>
                 </TableRow>
