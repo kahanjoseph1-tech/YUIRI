@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import StatusBadge from "@/components/StatusBadge";
 import ClientQuickProfileDialog from "@/components/clients/ClientQuickProfileDialog";
 import { attendeeSummary } from "@/lib/appointmentContacts";
+import { formatHebrewDate, weeklyParsha } from "@/lib/hebrewCalendar";
 
 const DAY_NAMES = [
   { en: "Sunday", yi: "זונטאג" },
@@ -15,7 +16,7 @@ const DAY_NAMES = [
   { en: "Wednesday", yi: "מיטוואך" },
   { en: "Thursday", yi: "דאנערשטאג" },
   { en: "Friday", yi: "פרייטאג" },
-  { en: "Saturday", yi: "שבת" },
+  { en: "Saturday", yi: "מוצאי שבת" },
 ];
 
 const hebrewDateFormatter = new Intl.DateTimeFormat("he-u-ca-hebrew", {
@@ -31,11 +32,7 @@ function asDate(value) {
 }
 
 function yiddishDate(date) {
-  try {
-    return hebrewDateFormatter.format(date);
-  } catch {
-    return "";
-  }
+  return formatHebrewDate(date, hebrewDateFormatter);
 }
 
 function timeLabel(time) {
@@ -94,6 +91,7 @@ export default function DayScheduleDialog({
   if (!day) return null;
 
   const dayName = DAY_NAMES[day.getDay()];
+  const parsha = weeklyParsha(day);
   const openNewAppointment = (time = "09:00", location = "Office", evaluatorName = "") => {
     onSchedule?.({
       date_time: localDateTimeValue(day, time),
@@ -114,6 +112,7 @@ export default function DayScheduleDialog({
           <DialogTitle>{format(day, "MMMM d, yyyy")}</DialogTitle>
           <p className="text-sm text-gray-500">
             {dayName.en} / {dayName.yi} · {yiddishDate(day)}
+            {parsha ? ` · ${parsha}` : ""}
           </p>
         </DialogHeader>
 

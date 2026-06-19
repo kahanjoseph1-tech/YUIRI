@@ -6,6 +6,7 @@ import {
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toneFor } from "@/lib/badges";
+import { formatHebrewDate, weeklyParsha } from "@/lib/hebrewCalendar";
 
 const DOT = {
   green: "bg-emerald-500", yellow: "bg-amber-500",
@@ -19,7 +20,7 @@ const WEEK_DAYS = [
   { en: "Wed", yi: "מיטוואך" },
   { en: "Thu", yi: "דאנערשטאג" },
   { en: "Fri", yi: "פרייטאג" },
-  { en: "Sat", yi: "שבת" },
+  { en: "Sat", yi: "מוצאי שבת" },
 ];
 
 const hebrewDateFormatter = new Intl.DateTimeFormat("he-u-ca-hebrew", {
@@ -28,11 +29,7 @@ const hebrewDateFormatter = new Intl.DateTimeFormat("he-u-ca-hebrew", {
 });
 
 function yiddishDate(day) {
-  try {
-    return hebrewDateFormatter.format(day);
-  } catch {
-    return "";
-  }
+  return formatHebrewDate(day, hebrewDateFormatter);
 }
 
 // Month grid calendar. Appointments are dots colored by status.
@@ -90,6 +87,7 @@ export default function AppointmentCalendar({
           const daySlots = slotsOn(day);
           const inMonth = isSameMonth(day, cursor);
           const today = isSameDay(day, new Date());
+          const parsha = day.getDay() === 6 ? weeklyParsha(day) : "";
           return (
             <div
               key={day.toISOString()}
@@ -109,6 +107,11 @@ export default function AppointmentCalendar({
                   <div className={`max-w-full truncate text-[10px] leading-tight ${inMonth ? "text-gray-400" : "text-gray-300"}`}>
                     {yiddishDate(day)}
                   </div>
+                  {parsha && (
+                    <div className={`mt-0.5 max-w-full truncate text-[10px] leading-tight ${inMonth ? "text-[#1e3a5f]" : "text-gray-300"}`}>
+                      {parsha}
+                    </div>
+                  )}
                 </div>
                 {daySlots.length > 0 && (
                   <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-medium text-emerald-700">
