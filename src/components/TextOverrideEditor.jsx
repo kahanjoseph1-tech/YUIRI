@@ -13,6 +13,12 @@ const COMMON_SKIP_SELECTOR = [
   "noscript",
   "svg",
   "option",
+  "a",
+  "button",
+  "[role='button']",
+  "[role='link']",
+  "[role='menuitem']",
+  "[role='option']",
   ".sr-only",
   "[aria-hidden='true']",
   "[contenteditable='true']",
@@ -206,10 +212,30 @@ export default function TextOverrideEditor() {
     };
   }, [scheduleApply]);
 
+  const editEntry = useCallback((entry) => {
+    if (!entry) return;
+
+    const currentValue = overridesRef.current[entry.original] || entry.original;
+    const nextValue = window.prompt(
+      `Change this wording:\n\n${entry.original}\n\nLeave blank to reset it.`,
+      currentValue
+    );
+    if (nextValue === null) return;
+
+    const cleanedValue = nextValue.trim();
+    const nextOverrides = { ...overridesRef.current };
+    if (!cleanedValue || cleanedValue === entry.original) {
+      delete nextOverrides[entry.original];
+    } else {
+      nextOverrides[entry.original] = nextValue;
+    }
+    setAndSaveOverrides(nextOverrides);
+  }, [setAndSaveOverrides]);
+
   useEffect(() => {
     if (!isEditing) return undefined;
 
-    const handleClick = (event) => {
+    const handleContextMenu = (event) => {
       const target = event.target;
       if (!(target instanceof Element)) return;
       if (target.closest(`[${ROOT_ATTR}]`)) return;
@@ -223,27 +249,12 @@ export default function TextOverrideEditor() {
 
       event.preventDefault();
       event.stopPropagation();
-
-      const currentValue = overridesRef.current[entry.original] || entry.original;
-      const nextValue = window.prompt(
-        `Change this wording:\n\n${entry.original}\n\nLeave blank to reset it.`,
-        currentValue
-      );
-      if (nextValue === null) return;
-
-      const cleanedValue = nextValue.trim();
-      const nextOverrides = { ...overridesRef.current };
-      if (!cleanedValue || cleanedValue === entry.original) {
-        delete nextOverrides[entry.original];
-      } else {
-        nextOverrides[entry.original] = nextValue;
-      }
-      setAndSaveOverrides(nextOverrides);
+      editEntry(entry);
     };
 
-    document.addEventListener("click", handleClick, true);
-    return () => document.removeEventListener("click", handleClick, true);
-  }, [isEditing, setAndSaveOverrides]);
+    document.addEventListener("contextmenu", handleContextMenu, true);
+    return () => document.removeEventListener("contextmenu", handleContextMenu, true);
+  }, [editEntry, isEditing]);
 
   const resetOverrides = () => {
     const confirmed = window.confirm("Remove all custom wording and go back to the app defaults?");
@@ -270,7 +281,7 @@ export default function TextOverrideEditor() {
       >
         {isEditing && (
           <div className="max-w-xs rounded-md border border-blue-100 bg-white px-3 py-2 text-xs text-slate-600 shadow-lg">
-            Click any highlighted wording, type your Yiddish text, then press OK.
+            Right-click highlighted wording, type your Yiddish text, then press OK.
           </div>
         )}
         <div className="flex flex-wrap justify-end gap-2 rounded-lg border border-slate-200 bg-white p-2 shadow-lg">
