@@ -11,14 +11,14 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth as firebaseAuth, db } from "@/lib/firebase";
 
 const collectionNames = {
-  User: ["users", "User"],
-  Client: ["clients", "Client", "Student", "students"],
-  Appointment: ["appointments", "Appointment", "Consultation", "consultations"],
-  AppointmentAvailability: ["appointment_availability", "AppointmentAvailability"],
-  Evaluation: ["evaluations", "Evaluation"],
-  BillingRecord: ["billing", "billingRecords", "BillingRecord", "Payment", "payments"],
-  School: ["schools", "School"],
-  Placement: ["placements", "Placement"],
+  User: "users",
+  Client: "clients",
+  Appointment: "appointments",
+  AppointmentAvailability: "appointment_availability",
+  Evaluation: "evaluations",
+  BillingRecord: "billing",
+  School: "schools",
+  Placement: "placements",
 };
 
 const enumMaps = {
@@ -91,12 +91,6 @@ function lowerRole(value) {
   return role;
 }
 
-function upperRole(value) {
-  if (!value) return undefined;
-  const role = String(value).toUpperCase();
-  return role === "ADMIN" ? "ADMIN" : role;
-}
-
 function compact(value) {
   if (Array.isArray(value)) return value.map(compact);
   if (!value || typeof value !== "object" || value instanceof Date) return value;
@@ -163,11 +157,11 @@ function fromUser(id, data) {
 
 function toUser(data) {
   return compact({
-    ...data,
+    email: data.email,
     full_name: data.full_name || data.name,
     name: data.name || data.full_name,
     crm_role: lowerRole(data.crm_role || data.role),
-    role: upperRole(data.crm_role || data.role),
+    firebase_uid: data.firebase_uid,
   });
 }
 
@@ -210,24 +204,32 @@ function toClient(data) {
   const parentNames = parentNamesFromClient(data);
   const phoneNumbers = normalizePhoneNumbers(data);
   const parentPhone = phoneNumbers[0]?.number || data.parent_phone;
+  const callerSource =
+    data.caller_source || data.callerSource || data.referral_source || data.referralSource || "";
   return compact({
-    ...data,
-    clientId: normalizeClientId(data.client_id || data.clientId),
-    boyFirstName: data.boy_first_name,
-    boyLastName: data.boy_last_name,
-    grade: data.grade_level,
-    parentNames,
+    client_id: normalizeClientId(data.client_id || data.clientId),
+    boy_first_name: data.boy_first_name || data.boyFirstName || data.first_name,
+    boy_last_name: data.boy_last_name || data.boyLastName || data.last_name,
+    age: data.age,
+    grade_level: data.grade_level || data.grade,
+    father_name: data.father_name || data.parent_name || data.parentName,
+    mother_name: data.mother_name,
+    parent_names: parentNames,
     phone_numbers: phoneNumbers,
-    phoneNumbers,
     parent_phone: parentPhone,
-    phone: parentPhone,
-    email: data.parent_email,
-    currentSchool: data.current_school,
-    referralSource: data.referral_source,
-    callerSource: data.caller_source,
-    responsiblePerson: data.responsible_person,
-    familyExpectations: data.family_expectations,
-    createdById: data.created_by_id || data.assigned_evaluator_id || data.createdById,
+    parent_email: data.parent_email || data.parentEmail || data.email,
+    city: data.city,
+    current_school: data.current_school || data.currentSchool,
+    referral_source: callerSource,
+    caller_source: callerSource,
+    responsible_person: data.responsible_person || data.responsiblePerson,
+    religious_level: data.religious_level || data.religiousLevel,
+    family_expectations: data.family_expectations || data.familyExpectations,
+    status: normalizeEnum(data.status, "clientStatus") || "New Client",
+    assigned_evaluator_id: data.assigned_evaluator_id || data.evaluatorId || data.createdById,
+    special_needs: data.special_needs,
+    ready_to_bill: Boolean(data.ready_to_bill),
+    notes: data.notes,
   });
 }
 
@@ -279,13 +281,15 @@ function fromAppointment(id, data) {
 
 function toAppointment(data) {
   return compact({
-    ...data,
-    clientId: data.client_id,
-    evaluatorId: data.evaluator_id,
-    dateTime: data.date_time,
-    meetingType: data.meeting_type,
-    clientName: data.client_name,
-    evaluatorName: data.evaluator_name,
+    client_id: data.client_id || data.clientId || data.student_id,
+    evaluator_id: data.evaluator_id || data.evaluatorId,
+    date_time: data.date_time || data.dateTime || data.date,
+    meeting_type: normalizeEnum(data.meeting_type || data.meetingType || data.type, "meetingType") || "Evaluation",
+    location: data.location || "Office",
+    status: normalizeEnum(data.status, "appointmentStatus") || "Scheduled",
+    notes: data.notes,
+    client_name: data.client_name || data.clientName,
+    evaluator_name: data.evaluator_name || data.evaluatorName,
   });
 }
 
@@ -304,9 +308,12 @@ function fromAppointmentAvailability(id, data) {
 
 function toAppointmentAvailability(data) {
   return compact({
-    ...data,
-    dayOfWeek: data.day_of_week,
-    durationMinutes: data.duration_minutes,
+    day_of_week: Number(data.day_of_week ?? data.dayOfWeek ?? 1),
+    time: data.time || "09:00",
+    duration_minutes: Number(data.duration_minutes || data.durationMinutes || 60),
+    location: data.location || "Office",
+    active: data.active !== false,
+    notes: data.notes,
   });
 }
 
@@ -339,19 +346,22 @@ function fromEvaluation(id, data) {
 
 function toEvaluation(data) {
   return compact({
-    ...data,
-    appointmentId: data.appointment_id,
-    clientId: data.client_id,
-    evaluatorId: data.evaluator_id,
-    clientName: data.client_name,
-    evaluatorName: data.evaluator_name,
-    learningStyle: data.learning_style,
-    behaviorNotes: data.behavior_notes,
-    religiousLevel: data.religious_level_observed,
-    familyExpectations: data.family_expectations_notes,
-    recommendedSchoolType: data.recommended_school_type,
-    suggestedSchools: data.suggested_schools,
-    finalRecommendation: data.final_recommendation,
+    appointment_id: data.appointment_id || data.appointmentId,
+    client_id: data.client_id || data.clientId,
+    evaluator_id: data.evaluator_id || data.evaluatorId,
+    client_name: data.client_name || data.clientName,
+    evaluator_name: data.evaluator_name || data.evaluatorName,
+    strengths: data.strengths,
+    challenges: data.challenges,
+    learning_style: data.learning_style || data.learningStyle,
+    behavior_notes: data.behavior_notes || data.behaviorNotes,
+    religious_level_observed: data.religious_level_observed || data.religiousLevel,
+    family_expectations_notes: data.family_expectations_notes || data.familyExpectations,
+    recommended_school_type: data.recommended_school_type || data.recommendedSchoolType,
+    suggested_schools: data.suggested_schools || data.suggestedSchools,
+    urgency: normalizeEnum(data.urgency, "urgency") || "Medium",
+    final_recommendation: data.final_recommendation || data.finalRecommendation,
+    status: normalizeEnum(data.status, "evaluationStatus") || "Pending",
   });
 }
 
@@ -375,15 +385,17 @@ function fromBillingRecord(id, data) {
 
 function toBillingRecord(data) {
   return compact({
-    ...data,
-    clientId: data.client_id,
-    clientName: data.client_name,
-    serviceType: data.service_type,
-    appointmentDate: data.appointment_date,
-    billingStatus: data.billing_status,
-    invoiceNumber: data.invoice_number,
-    paidDate: data.paid_date,
-    paymentMethod: data.payment_method,
+    client_id: data.client_id || data.clientId || data.student_id,
+    client_name: data.client_name || data.clientName || data.student_name,
+    service_type: data.service_type || data.serviceType || data.type,
+    appointment_date: data.appointment_date || data.appointmentDate || data.due_date || data.date,
+    amount: Number(data.amount || 0),
+    billing_status:
+      normalizeEnum(data.billing_status || data.billingStatus || data.status, "billingStatus") || "Not Billed",
+    invoice_number: data.invoice_number || data.invoiceNumber,
+    paid_date: data.paid_date || data.paidDate,
+    payment_method: data.payment_method || data.paymentMethod || data.method,
+    notes: data.notes,
   });
 }
 
@@ -493,8 +505,6 @@ function createEntity(entityName) {
       }
       const payload = compact({
         ...transformer.toDb(sourceData),
-        createdAt: now,
-        updatedAt: now,
         created_date: now,
         updated_date: now,
       });
@@ -511,7 +521,6 @@ function createEntity(entityName) {
       }
       const payload = compact({
         ...transformer.toDb(sourceData),
-        updatedAt: now,
         updated_date: now,
       });
       const target = await findDocumentInCollections(entityName, id);
