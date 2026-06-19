@@ -1,66 +1,52 @@
 # Yuiri
 
-A Boys' School Referral CRM for managing client intake, evaluations, school matching, and billing for Jewish boys' school placements.
+Yuiri is a boys' school referral CRM for client intake, scheduling, evaluations,
+school matching, placements, billing, and reporting.
+
+This repo now uses the `yuiri-v2` React interface with the existing Yuiri
+Firebase project (`yuiri-1f4d3`) as the backend.
 
 ## Tech Stack
 
-- **Framework:** Next.js 16 (App Router)
-- **Language:** TypeScript
-- **Auth:** NextAuth.js
-- **Database:** Firebase / Firestore
-- **UI:** Tailwind CSS, Radix UI, shadcn/ui components
-- **Charts:** Recharts
+- Vite + React
+- Tailwind CSS + shadcn/ui components
+- Firebase Auth
+- Firestore
+- Firebase Hosting
 
-## Setup
+## Local Development
 
-1. **Clone and install**
+```bash
+npm install
+npm run dev
+```
 
-   ```bash
-   git clone <repo-url>
-   cd YUIRI
-   npm install
-   ```
+The app includes fallback Firebase client config for `yuiri-1f4d3`. To override
+it locally, copy `.env.example` to `.env.local` and set the `VITE_FIREBASE_*`
+values.
 
-2. **Configure environment variables**
+## Build
 
-   ```bash
-   cp .env.example .env.local
-   ```
+```bash
+npm run build
+```
 
-   Fill in your Firebase project credentials and generate a `NEXTAUTH_SECRET`:
+Firebase Hosting serves the static Vite build from `dist` and rewrites all
+routes to `index.html`.
 
-   ```bash
-   openssl rand -base64 32
-   ```
+## Data Compatibility
 
-3. **Seed the database**
+The v2 UI still imports `base44.entities.*` for minimal page churn, but
+`src/api/base44Client.js` is now a Firebase adapter. It reads and writes
+Firestore collections:
 
-   ```bash
-   npx tsx scripts/seed.ts
-   ```
+- `users`
+- `clients`
+- `appointments`
+- `evaluations`
+- `billing`
+- `schools`
+- `placements`
 
-   This creates sample users, clients, appointments, evaluations, and billing records in Firestore.
-
-4. **Run the dev server**
-
-   ```bash
-   npm run dev
-   ```
-
-   Open [http://localhost:3000](http://localhost:3000).
-
-## Default Login Credentials
-
-| Role      | Email                  | Password        |
-| --------- | ---------------------- | --------------- |
-| Admin     | admin@yuiri.com        | admin123        |
-| Scheduler | scheduler@yuiri.com    | scheduler123    |
-| Evaluator | evaluator@yuiri.com    | evaluator123    |
-| Billing   | billing@yuiri.com      | billing123      |
-
-## User Roles
-
-- **ADMIN** -- Full access to all features: user management, client records, appointments, evaluations, and billing.
-- **SCHEDULER** -- Manages client intake, creates and updates appointments, and handles scheduling logistics.
-- **EVALUATOR** -- Conducts student evaluations, writes assessment reports, and recommends school placements.
-- **BILLING** -- Manages invoices, tracks payments, and handles financial records for client services.
+Existing camelCase records from the original Firebase app are normalized into
+the snake_case fields expected by the v2 UI.
