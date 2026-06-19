@@ -14,6 +14,7 @@ import {
   uniqueOptions,
 } from "@/lib/dropdownSettings";
 import { PAYMENT_METHODS } from "@/lib/constants";
+import { ATTENDEE_TYPES, appointmentAttendeeForClient } from "@/lib/appointmentContacts";
 
 // Converts a stored ISO datetime to a value for <input type="datetime-local">.
 function toLocalInput(iso) {
@@ -32,6 +33,7 @@ export default function AppointmentFormDialog({
   defaultClientId,
   defaultDateTime = "",
   defaultLocation = "Office",
+  defaultEvaluatorName = "",
   onSave,
 }) {
   const [form, setForm] = useState({});
@@ -44,23 +46,42 @@ export default function AppointmentFormDialog({
 
   useEffect(() => {
     if (!open) return;
-    setForm(appointment
-      ? {
-          ...appointment,
-          date_time: toLocalInput(appointment.date_time),
-          meeting_type: appointment.meeting_type || "Evaluation",
-          location: appointment.location || "Office",
-          payment_amount_due: appointment.payment_amount_due ?? (appointment.meeting_type === "Evaluation" ? 300 : ""),
-          payment_method: appointment.payment_method || "",
-          payment_note: appointment.payment_note || "",
-          card_last4: appointment.card_last4 || "",
-        }
-      : {
-          client_id: defaultClientId || "", evaluator_id: "", evaluator_name: "", date_time: defaultDateTime,
-          meeting_type: "Evaluation", location: defaultLocation || "Office", status: "Scheduled",
-          payment_amount_due: 300, payment_method: "", payment_note: "", card_last4: "", notes: "",
-        });
-  }, [open, appointment, defaultClientId, defaultDateTime, defaultLocation]);
+    if (appointment) {
+      setForm({
+        ...appointment,
+        date_time: toLocalInput(appointment.date_time),
+        meeting_type: appointment.meeting_type || "Evaluation",
+        location: appointment.location || "Office",
+        payment_amount_due: appointment.payment_amount_due ?? (appointment.meeting_type === "Evaluation" ? 300 : ""),
+        payment_method: appointment.payment_method || "",
+        payment_note: appointment.payment_note || "",
+        card_last4: appointment.card_last4 || "",
+        attendee_type: appointment.attendee_type || "",
+        attendee_name: appointment.attendee_name || "",
+        attendee_phone: appointment.attendee_phone || "",
+      });
+      return;
+    }
+
+    const attendeeType = "Father";
+    const client = clients.find((c) => c.id === defaultClientId);
+    setForm({
+      client_id: defaultClientId || "",
+      evaluator_id: "",
+      evaluator_name: defaultEvaluatorName || "",
+      date_time: defaultDateTime,
+      meeting_type: "Evaluation",
+      location: defaultLocation || "Office",
+      status: "Scheduled",
+      attendee_type: attendeeType,
+      ...appointmentAttendeeForClient(client, attendeeType),
+      payment_amount_due: 300,
+      payment_method: "",
+      payment_note: "",
+      card_last4: "",
+      notes: "",
+    });
+  }, [open, appointment, clients, defaultClientId, defaultDateTime, defaultLocation, defaultEvaluatorName]);
 
   const update = (field, value) => setForm((p) => ({ ...p, [field]: value }));
 
@@ -101,6 +122,25 @@ export default function AppointmentFormDialog({
     [dropdownOptions.appointment_locations, form.location]
   );
 
+  const selectedClient = clients.find((c) => c.id === form.client_id);
+
+  const updateClient = (clientId) => {
+    const nextClient = clients.find((c) => c.id === clientId);
+    setForm((current) => ({
+      ...current,
+      client_id: clientId,
+      ...(current.attendee_type ? appointmentAttendeeForClient(nextClient, current.attendee_type) : {}),
+    }));
+  };
+
+  const updateAttendeeType = (attendeeType) => {
+    setForm((current) => ({
+      ...current,
+      attendee_type: attendeeType,
+      ...appointmentAttendeeForClient(selectedClient, attendeeType),
+    }));
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -115,6 +155,9 @@ export default function AppointmentFormDialog({
         payment_method: form.payment_method || "",
         payment_note: form.payment_note || "",
         card_last4: String(form.card_last4 || "").replace(/\D/g, "").slice(-4),
+        attendee_type: form.attendee_type || "",
+        attendee_name: form.attendee_name || "",
+        attendee_phone: form.attendee_phone || "",
         client_name: client ? `${client.boy_first_name} ${client.boy_last_name}` : form.client_name,
         evaluator_name: form.evaluator_name || "",
       });
@@ -141,7 +184,7 @@ export default function AppointmentFormDialog({
             <Combobox
               options={clientOptions}
               value={form.client_id}
-              onChange={(v) => update("client_id", v)}
+              onChange={updateClient}
               placeholder="Select client"
             />
           </div>
@@ -178,6 +221,27 @@ export default function AppointmentFormDialog({
                 <SelectContent>{meetingTypeOptions.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
               </Select>
             </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-gray-500">Who is coming</Label>
+            <div className="grid grid-cols-1 sm:grid-cols-[11rem_minmax(0,1fr)] gap-2">
+              <Select value={form.attendee_type || ""} onValueChange={updateAttendeeType}>
+                <SelectTrigger><SelectValue placeholder="Select person" /></SelectTrigger>
+                <SelectContent>
+                  {ATTENDEE_TYPES.map((type) => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Input
+                value={form.attendee_name || ""}
+                onChange={(event) => update("attendee_name", event.target.value)}
+                placeholder="Name"
+              />
+            </div>
+            <Input
+              value={form.attendee_phone || ""}
+              onChange={(event) => update("attendee_phone", event.target.value)}
+              placeholder="Phone number"
+            />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs font-medium text-gray-500">Location / Zoom Link</Label>

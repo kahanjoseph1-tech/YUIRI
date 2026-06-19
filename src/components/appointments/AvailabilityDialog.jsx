@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -6,6 +7,12 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  DEFAULT_DROPDOWN_OPTIONS,
+  DROPDOWN_OPTIONS_QUERY_KEY,
+  getDropdownOptions,
+  uniqueOptions,
+} from "@/lib/dropdownSettings";
 
 const DAYS = [
   { value: 0, label: "Sunday" },
@@ -24,6 +31,7 @@ function newDraftSlot() {
     time: "21:00",
     duration_minutes: 60,
     location: "Office",
+    evaluator_name: "",
     active: true,
   };
 }
@@ -38,6 +46,16 @@ function sortSlots(rows) {
 
 export default function AvailabilityDialog({ open, onOpenChange, slots = [], onSave, saving = false }) {
   const [rows, setRows] = useState([]);
+
+  const { data: dropdownOptions = DEFAULT_DROPDOWN_OPTIONS } = useQuery({
+    queryKey: DROPDOWN_OPTIONS_QUERY_KEY,
+    queryFn: getDropdownOptions,
+  });
+
+  const evaluatorOptions = useMemo(
+    () => uniqueOptions(dropdownOptions.appointment_evaluators || []),
+    [dropdownOptions.appointment_evaluators]
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -64,6 +82,7 @@ export default function AvailabilityDialog({ open, onOpenChange, slots = [], onS
         time: row.time || "09:00",
         duration_minutes: Number(row.duration_minutes || 60),
         location: row.location?.trim() || "Office",
+        evaluator_name: row.evaluator_name || "",
         active: row.active !== false,
       }))
       .filter((row) => row.time);
@@ -80,8 +99,9 @@ export default function AvailabilityDialog({ open, onOpenChange, slots = [], onS
         </DialogHeader>
 
         <div className="space-y-3 py-2">
-          <div className="hidden md:grid md:grid-cols-[1.1fr_120px_100px_1fr_80px_44px] gap-2 px-1 text-xs font-medium text-gray-500">
+          <div className="hidden md:grid md:grid-cols-[1.1fr_1fr_120px_100px_1fr_80px_44px] gap-2 px-1 text-xs font-medium text-gray-500">
             <span>Day</span>
+            <span>Evaluator</span>
             <span>Time</span>
             <span>Minutes</span>
             <span>Location</span>
@@ -94,8 +114,10 @@ export default function AvailabilityDialog({ open, onOpenChange, slots = [], onS
               No available slots set.
             </div>
           ) : (
-            rows.map((row) => (
-              <div key={row.draft_id} className="grid gap-2 rounded-lg border border-gray-100 p-3 md:grid-cols-[1.1fr_120px_100px_1fr_80px_44px] md:items-center md:border-0 md:p-0">
+            rows.map((row) => {
+              const rowEvaluatorOptions = uniqueOptions([...evaluatorOptions, row.evaluator_name]);
+              return (
+              <div key={row.draft_id} className="grid gap-2 rounded-lg border border-gray-100 p-3 md:grid-cols-[1.1fr_1fr_120px_100px_1fr_80px_44px] md:items-center md:border-0 md:p-0">
                 <div className="space-y-1 md:space-y-0">
                   <Label className="text-xs font-medium text-gray-500 md:hidden">Day</Label>
                   <Select
@@ -106,6 +128,22 @@ export default function AvailabilityDialog({ open, onOpenChange, slots = [], onS
                     <SelectContent>
                       {DAYS.map((day) => (
                         <SelectItem key={day.value} value={String(day.value)}>{day.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1 md:space-y-0">
+                  <Label className="text-xs font-medium text-gray-500 md:hidden">Evaluator</Label>
+                  <Select
+                    value={row.evaluator_name || "none"}
+                    onValueChange={(value) => updateRow(row.draft_id, "evaluator_name", value === "none" ? "" : value)}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Any evaluator" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Any evaluator</SelectItem>
+                      {rowEvaluatorOptions.map((name) => (
+                        <SelectItem key={name} value={name}>{name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -153,7 +191,8 @@ export default function AvailabilityDialog({ open, onOpenChange, slots = [], onS
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
-            ))
+              );
+            })
           )}
 
           <Button type="button" variant="outline" className="gap-2" onClick={addRow}>

@@ -1,10 +1,12 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { format, isSameDay, parseISO } from "date-fns";
-import { CalendarPlus, Clock, MapPin, Pencil } from "lucide-react";
+import { CalendarPlus, Clock, MapPin, Pencil, RotateCcw, UserRound, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import StatusBadge from "@/components/StatusBadge";
+import ClientQuickProfileDialog from "@/components/clients/ClientQuickProfileDialog";
+import { attendeeSummary } from "@/lib/appointmentContacts";
 
 const DAY_NAMES = [
   { en: "Sunday", yi: "זונטאג" },
@@ -58,10 +60,20 @@ export default function DayScheduleDialog({
   day,
   appointments = [],
   availabilitySlots = [],
+  clients = [],
   canWrite = false,
+  onCancel,
   onEdit,
+  onReschedule,
   onSchedule,
 }) {
+  const [profileClient, setProfileClient] = useState(null);
+
+  const clientById = useMemo(
+    () => new Map(clients.map((client) => [client.id, client])),
+    [clients]
+  );
+
   const dayAppointments = useMemo(() => {
     if (!day) return [];
     return appointments
@@ -82,11 +94,17 @@ export default function DayScheduleDialog({
   if (!day) return null;
 
   const dayName = DAY_NAMES[day.getDay()];
-  const openNewAppointment = (time = "09:00", location = "Office") => {
+  const openNewAppointment = (time = "09:00", location = "Office", evaluatorName = "") => {
     onSchedule?.({
       date_time: localDateTimeValue(day, time),
       location: location || "Office",
+      evaluator_name: evaluatorName || "",
     });
+  };
+
+  const openClientProfile = (clientId) => {
+    const client = clientById.get(clientId);
+    if (client) setProfileClient(client);
   };
 
   return (
@@ -117,7 +135,11 @@ export default function DayScheduleDialog({
             ) : (
               <div className="space-y-2">
                 {daySlots.map((slot) => {
-                  const booked = dayAppointments.find((appointment) => appointmentTime(appointment) === slot.time);
+                  const booked = dayAppointments.find((appointment) => {
+                    if (appointmentTime(appointment) !== slot.time) return false;
+                    if (!slot.evaluator_name) return true;
+                    return appointment.evaluator_name === slot.evaluator_name;
+                  });
                   return (
                     <div key={slot.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-gray-100 p-3">
                       <div>
@@ -132,6 +154,10 @@ export default function DayScheduleDialog({
                           <MapPin className="h-3.5 w-3.5" />
                           {slot.location || "Office"} · {slot.duration_minutes || 60} min
                         </p>
+                        <p className="mt-1 flex items-center gap-1.5 text-xs text-gray-500">
+                          <UserRound className="h-3.5 w-3.5" />
+                          {slot.evaluator_name || "Any evaluator"}
+                        </p>
                         {booked && (
                           <p className="mt-1 text-xs text-gray-500">
                             {booked.client_name || "Client"} · {booked.meeting_type || "Meeting"}
@@ -145,7 +171,7 @@ export default function DayScheduleDialog({
                           size="sm"
                           variant={booked ? "outline" : "default"}
                           className={booked ? "" : "bg-[#1e3a5f] hover:bg-[#1e3a5f]/90"}
-                          onClick={() => openNewAppointment(slot.time, slot.location)}
+                          onClick={() => openNewAppointment(slot.time, slot.location, slot.evaluator_name)}
                         >
                           {booked ? "Override" : "Schedule"}
                         </Button>
@@ -167,21 +193,43 @@ export default function DayScheduleDialog({
               <div className="divide-y divide-gray-100 rounded-lg border border-gray-100">
                 {dayAppointments.map((appointment) => {
                   const date = asDate(appointment.date_time);
+                  const appointmentAttendee = attendeeSummary(appointment);
+                  const canOpenClient = Boolean(clientById.get(appointment.client_id));
                   return (
                     <div key={appointment.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3">
                       <div>
-                        <p className="text-sm font-semibold text-gray-900">{appointment.client_name || "Client"}</p>
+                        <button
+                          type="button"
+                          className={`text-left text-sm font-semibold ${canOpenClient ? "text-blue-700 hover:underline" : "text-gray-900"}`}
+                          onClick={() => openClientProfile(appointment.client_id)}
+                          disabled={!canOpenClient}
+                        >
+                          {appointment.client_name || "Client"}
+                        </button>
                         <p className="text-xs text-gray-500">
                           {date ? format(date, "h:mm a") : "No time"} · {appointment.meeting_type || "Meeting"} · {appointment.location || "Office"}
                         </p>
                         {appointment.evaluator_name && <p className="text-xs text-gray-400">{appointment.evaluator_name}</p>}
+                        {appointmentAttendee && <p className="text-xs text-gray-400">{appointmentAttendee}</p>}
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center justify-end gap-2">
                         <StatusBadge status={appointment.status} />
                         {canWrite && (
-                          <Button type="button" size="icon" variant="ghost" onClick={() => onEdit?.(appointment)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
+                          <>
+                            <Button type="button" size="sm" variant="outline" className="h-8 gap-1 text-xs" onClick={() => onReschedule?.(appointment)}>
+                              <RotateCcw className="h-3.5 w-3.5" />
+                              Reschedule
+                            </Button>
+                            {appointment.status !== "Cancelled" && (
+                              <Button type="button" size="sm" variant="outline" className="h-8 gap-1 text-xs text-red-600 hover:text-red-700" onClick={() => onCancel?.(appointment)}>
+                                <XCircle className="h-3.5 w-3.5" />
+                                Cancel
+                              </Button>
+                            )}
+                            <Button type="button" size="icon" variant="ghost" onClick={() => onEdit?.(appointment)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </>
                         )}
                       </div>
                     </div>
@@ -192,6 +240,13 @@ export default function DayScheduleDialog({
           </section>
         </div>
       </DialogContent>
+      <ClientQuickProfileDialog
+        open={!!profileClient}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setProfileClient(null);
+        }}
+        client={profileClient}
+      />
     </Dialog>
   );
 }

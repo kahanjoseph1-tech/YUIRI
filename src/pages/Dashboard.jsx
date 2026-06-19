@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { firebaseClient } from "@/api/firebaseClient";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
@@ -9,6 +9,7 @@ import {
 import { useRole } from "@/lib/useRole";
 import { fmtCurrency, fmtDateTime, toDate } from "@/lib/format";
 import { Skeleton } from "@/components/ui/skeleton";
+import ClientQuickProfileDialog from "@/components/clients/ClientQuickProfileDialog";
 
 function StatCard({ to, title, value, icon: Icon, color }) {
   const colors = {
@@ -32,19 +33,24 @@ function StatCard({ to, title, value, icon: Icon, color }) {
 }
 
 export default function Dashboard() {
-  const { role, canAccessPage } = useRole();
+  const { canAccessPage } = useRole();
+  const [profileClient, setProfileClient] = useState(null);
 
   const { data: clients = [], isLoading: l1 } = useQuery({
     queryKey: ["clients"], queryFn: () => firebaseClient.entities.Client.list("-created_date", 500),
+    refetchInterval: 30000,
   });
   const { data: appointments = [], isLoading: l2 } = useQuery({
     queryKey: ["appointments"], queryFn: () => firebaseClient.entities.Appointment.list("-date_time", 500),
+    refetchInterval: 30000,
   });
   const { data: evaluations = [], isLoading: l3 } = useQuery({
     queryKey: ["evaluations"], queryFn: () => firebaseClient.entities.Evaluation.list("-created_date", 500),
+    refetchInterval: 30000,
   });
   const { data: billing = [], isLoading: l4 } = useQuery({
     queryKey: ["billing"], queryFn: () => firebaseClient.entities.BillingRecord.list("-created_date", 500),
+    refetchInterval: 30000,
   });
 
   const loading = l1 || l2 || l3 || l4;
@@ -54,7 +60,7 @@ export default function Dashboard() {
   const in7 = new Date(now.getTime() + 7 * 86400000);
   const upcoming = appointments.filter((a) => {
     const d = toDate(a.date_time);
-    return a.status === "Scheduled" && d && d >= now && d <= in7;
+    return !["Cancelled", "Completed", "No Show"].includes(a.status) && d && d >= now && d <= in7;
   }).length;
   const pendingEvals = evaluations.filter((e) => e.status === "Pending" || e.status === "In Progress").length;
   const readyToBill = clients.filter((c) => c.ready_to_bill).length;
@@ -70,11 +76,28 @@ export default function Dashboard() {
     { key: "Billing", to: createPageUrl("Billing"), title: "Unpaid Invoices", value: fmtCurrency(unpaidTotal), icon: Receipt, color: "red" },
   ].filter((c) => canAccessPage(c.key));
 
+  const clientById = new Map(clients.map((client) => [client.id, client]));
+
   // Recent activity feed across entities.
   const activity = [
-    ...appointments.map((a) => ({ ts: a.created_date, text: `Appointment · ${a.client_name || "Client"} (${a.meeting_type || "Meeting"})`, status: a.status })),
-    ...evaluations.map((e) => ({ ts: e.created_date, text: `Evaluation · ${e.client_name || "Client"}`, status: e.status })),
-    ...billing.map((b) => ({ ts: b.created_date, text: `Billing · ${b.client_name || "Client"} (${b.service_type || "Service"})`, status: b.billing_status })),
+    ...appointments.map((a) => ({
+      ts: a.updated_date || a.created_date || a.date_time,
+      client_id: a.client_id,
+      text: `Appointment · ${a.client_name || "Client"} (${a.meeting_type || "Meeting"})`,
+      right: a.date_time ? `Appointment: ${fmtDateTime(a.date_time)}` : fmtDateTime(a.created_date),
+    })),
+    ...evaluations.map((e) => ({
+      ts: e.updated_date || e.created_date,
+      client_id: e.client_id,
+      text: `Evaluation · ${e.client_name || "Client"}`,
+      right: fmtDateTime(e.updated_date || e.created_date),
+    })),
+    ...billing.map((b) => ({
+      ts: b.updated_date || b.created_date,
+      client_id: b.client_id,
+      text: `Billing · ${b.client_name || "Client"} (${b.service_type || "Service"})`,
+      right: fmtDateTime(b.updated_date || b.created_date),
+    })),
   ].filter((x) => x.ts).sort((a, b) => new Date(b.ts) - new Date(a.ts)).slice(0, 12);
 
   return (
@@ -105,17 +128,32 @@ export default function Dashboard() {
           <p className="text-sm text-gray-400 p-8 text-center">No activity yet.</p>
         ) : (
           <div className="divide-y divide-gray-50">
-            {activity.map((a, i) => (
-              <div key={i} className="flex items-center justify-between px-5 py-3">
-                <p className="text-sm text-gray-700">{a.text}</p>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-gray-400">{fmtDateTime(a.ts)}</span>
-                </div>
-              </div>
-            ))}
+            {activity.map((a, i) => {
+              const client = clientById.get(a.client_id);
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  className={`flex w-full items-center justify-between gap-4 px-5 py-3 text-left ${client ? "hover:bg-gray-50" : ""}`}
+                  onClick={() => client && setProfileClient(client)}
+                  disabled={!client}
+                >
+                  <p className="min-w-0 text-sm text-gray-700">{a.text}</p>
+                  <span className="shrink-0 text-xs text-gray-400">{a.right}</span>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
+
+      <ClientQuickProfileDialog
+        open={!!profileClient}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setProfileClient(null);
+        }}
+        client={profileClient}
+      />
     </div>
   );
 }

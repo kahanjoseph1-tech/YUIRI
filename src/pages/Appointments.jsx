@@ -16,6 +16,7 @@ import { ensureEvaluationBillingForAppointment, onAppointmentCompleted } from "@
 import { can } from "@/lib/roles";
 import { useRole } from "@/lib/useRole";
 import { fmtDateTime } from "@/lib/format";
+import { attendeeSummary } from "@/lib/appointmentContacts";
 
 function availabilityPayload(row) {
   return {
@@ -23,6 +24,7 @@ function availabilityPayload(row) {
     time: row.time || "09:00",
     duration_minutes: Number(row.duration_minutes || 60),
     location: row.location || "Office",
+    evaluator_name: row.evaluator_name || "",
     active: row.active !== false,
   };
 }
@@ -121,6 +123,8 @@ export default function Appointments() {
     () => [...availabilitySlots].sort((a, b) => {
       const dayDiff = Number(a.day_of_week) - Number(b.day_of_week);
       if (dayDiff !== 0) return dayDiff;
+      const evaluatorDiff = String(a.evaluator_name || "").localeCompare(String(b.evaluator_name || ""));
+      if (evaluatorDiff !== 0) return evaluatorDiff;
       return String(a.time || "").localeCompare(String(b.time || ""));
     }),
     [availabilitySlots]
@@ -195,6 +199,7 @@ export default function Appointments() {
               <div>
                 <p className="text-sm font-semibold text-gray-900">{a.client_name || "Client"}</p>
                 <p className="text-xs text-gray-400">{a.meeting_type || "Meeting"} · {fmtDateTime(a.date_time)}{a.evaluator_name ? ` · ${a.evaluator_name}` : ""}</p>
+                {attendeeSummary(a) && <p className="text-xs text-gray-400">{attendeeSummary(a)}</p>}
               </div>
               <StatusBadge status={a.status} />
             </div>
@@ -207,6 +212,7 @@ export default function Appointments() {
         clients={clients}
         defaultDateTime={appointmentDefaults?.date_time || ""}
         defaultLocation={appointmentDefaults?.location || "Office"}
+        defaultEvaluatorName={appointmentDefaults?.evaluator_name || ""}
         onSave={(data) => createMutation.mutateAsync(data)}
       />
       <AppointmentFormDialog
@@ -220,7 +226,17 @@ export default function Appointments() {
         day={selectedDay}
         appointments={roleVisibleAppointments}
         availabilitySlots={sortedAvailabilitySlots}
+        clients={clients}
         canWrite={canWrite}
+        onCancel={(appointment) => updateMutation.mutateAsync({
+          id: appointment.id,
+          data: { ...appointment, status: "Cancelled" },
+          prev: appointment,
+        })}
+        onReschedule={(appointment) => {
+          setSelectedDay(null);
+          setEditAppt({ ...appointment, status: "Rescheduled" });
+        }}
         onEdit={(appointment) => {
           setSelectedDay(null);
           setEditAppt(appointment);
