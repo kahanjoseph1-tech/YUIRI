@@ -9,6 +9,16 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 export default defineConfig({
   logLevel: 'error', // Suppress warnings, only show errors
   plugins: [react()],
+  build: {
+    emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        entryFileNames: 'assets/[name]-[hash]-clean.js',
+        chunkFileNames: 'assets/[name]-[hash]-clean.js',
+        assetFileNames: 'assets/[name]-[hash]-clean[extname]',
+      },
+    },
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

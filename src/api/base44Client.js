@@ -554,9 +554,15 @@ async function ensureUserRecord(firebaseUser) {
     const existing = users.find(
       (user) => user.email?.toLowerCase() === email.toLowerCase()
     );
-    if (existing) return existing;
+    const hasAdmin = users.some((user) => lowerRole(user.crm_role || user.role) === "admin");
+    if (existing) {
+      if (!hasAdmin && lowerRole(existing.crm_role || existing.role) !== "admin") {
+        return entities.User.update(existing.id, { crm_role: "admin" });
+      }
+      return existing;
+    }
 
-    const crm_role = users.length === 0 ? "admin" : "scheduler";
+    const crm_role = hasAdmin ? "scheduler" : "admin";
     return entities.User.create({
       email,
       full_name: displayName,
