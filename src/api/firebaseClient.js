@@ -52,6 +52,10 @@ function normalizeRole(value) {
   return String(value || "").toLowerCase() === "admin" ? "admin" : "user";
 }
 
+function normalizeApprovalStatus(value) {
+  return String(value || "").toLowerCase() === "approved" ? "approved" : "pending";
+}
+
 function normalizeClientId(value) {
   const digits = String(value || "").replace(/\D/g, "");
   if (!digits) return "";
@@ -104,7 +108,7 @@ function fromUser(id, data) {
     crm_role: role,
     role,
     firebase_uid: data.firebase_uid || "",
-    approval_status: data.approval_status || "pending",
+    approval_status: normalizeApprovalStatus(data.approval_status),
   };
 }
 
@@ -115,7 +119,7 @@ function toUser(data) {
     name: data.name || data.full_name,
     crm_role: normalizeRole(data.crm_role || data.role),
     firebase_uid: data.firebase_uid,
-    approval_status: data.approval_status,
+    approval_status: normalizeApprovalStatus(data.approval_status),
   });
 }
 

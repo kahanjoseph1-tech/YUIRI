@@ -13,7 +13,7 @@ service firebase.storage {
     function currentUserIsApproved() {
       return signedIn()
         && firestore.exists(currentUserPath())
-        && firestore.get(currentUserPath()).data.approval_status == "approved";
+        && firestore.get(currentUserPath()).data.approval_status in ["approved", "Approved"];
     }
 
     match /clients/{clientPath=**} {

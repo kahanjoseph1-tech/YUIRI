@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { FileText, ImageIcon, Plus, Trash2, UploadCloud } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -196,12 +197,20 @@ export default function ClientFormDrawer({ open, onOpenChange, client, onSave })
       const callerSource = form.caller_source || form.referral_source || "";
       const responsiblePerson = form.responsible_person || "";
       const clientKey = client?.id || form.client_id || uploadGroupRef.current;
-      const uploadedPhoto = pendingPhoto
-        ? await uploadClientFile(pendingPhoto, clientKey, "profile")
-        : form.profile_photo || null;
-      const uploadedFiles = pendingFiles.length > 0
-        ? await Promise.all(pendingFiles.map((file) => uploadClientFile(file, clientKey, "files")))
-        : [];
+      let uploadedPhoto = form.profile_photo || null;
+      let uploadedFiles = [];
+
+      try {
+        uploadedPhoto = pendingPhoto
+          ? await uploadClientFile(pendingPhoto, clientKey, "profile")
+          : uploadedPhoto;
+        uploadedFiles = pendingFiles.length > 0
+          ? await Promise.all(pendingFiles.map((file) => uploadClientFile(file, clientKey, "files")))
+          : [];
+      } catch (uploadError) {
+        console.error("Client file upload failed:", uploadError);
+        toast.error("File upload failed. Saving the client without the new files.");
+      }
 
       await onSave({
         ...form,
@@ -222,6 +231,7 @@ export default function ClientFormDrawer({ open, onOpenChange, client, onSave })
       onOpenChange(false);
     } catch (error) {
       console.error("Client save failed:", error);
+      toast.error(error?.message || "Failed to save client");
     } finally {
       setSaving(false);
     }

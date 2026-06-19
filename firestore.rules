@@ -13,12 +13,12 @@ service cloud.firestore {
     function currentUserIsApproved() {
       return signedIn()
         && exists(currentUserPath())
-        && get(currentUserPath()).data.approval_status == "approved";
+        && get(currentUserPath()).data.approval_status in ["approved", "Approved"];
     }
 
     function currentUserIsAdmin() {
       return currentUserIsApproved()
-        && get(currentUserPath()).data.crm_role == "admin";
+        && get(currentUserPath()).data.crm_role in ["admin", "Admin"];
     }
 
     function isBootstrapAdmin() {
@@ -56,8 +56,8 @@ service cloud.firestore {
     }
 
     function validUserUpdate() {
-      return request.resource.data.crm_role in ["admin", "user"]
-        && request.resource.data.approval_status in ["approved", "pending"];
+      return request.resource.data.crm_role in ["admin", "user", "Admin", "User"]
+        && request.resource.data.approval_status in ["approved", "pending", "Approved", "Pending"];
     }
 
     match /users/{userId} {
