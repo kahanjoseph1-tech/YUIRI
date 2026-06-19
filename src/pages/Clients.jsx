@@ -64,12 +64,18 @@ export default function Clients() {
   const createMutation = useMutation({
     mutationFn: (data) => base44.entities.Client.create(data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["clients"] }); toast.success("Client added"); },
-    onError: () => toast.error("Failed to add client"),
+    onError: (error) => {
+      console.error("Failed to add client:", error);
+      toast.error(error?.message || "Failed to add client");
+    },
   });
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.Client.update(id, data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["clients"] }); toast.success("Client updated"); },
-    onError: () => toast.error("Failed to update client"),
+    onError: (error) => {
+      console.error("Failed to update client:", error);
+      toast.error(error?.message || "Failed to update client");
+    },
   });
 
   const filtered = useMemo(() => {

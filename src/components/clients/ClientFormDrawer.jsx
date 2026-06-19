@@ -189,6 +189,8 @@ export default function ClientFormDrawer({ open, onOpenChange, client, evaluator
         special_needs: needsText ? needsText.split(",").map((s) => s.trim()).filter(Boolean) : [],
       });
       onOpenChange(false);
+    } catch (error) {
+      console.error("Client save failed:", error);
     } finally {
       setSaving(false);
     }
