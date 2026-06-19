@@ -14,6 +14,7 @@ const collectionNames = {
   User: "users",
   Client: "clients",
   Appointment: "appointments",
+  AppointmentAvailability: "appointment_availability",
   Evaluation: "evaluations",
   BillingRecord: "billing",
   School: "schools",
@@ -261,8 +262,8 @@ function fromAppointment(id, data) {
     client_id: data.client_id || data.clientId || "",
     evaluator_id: data.evaluator_id || data.evaluatorId || "",
     date_time: toIso(data.date_time || data.dateTime),
-    meeting_type: normalizeEnum(data.meeting_type || data.meetingType, "meetingType") || "Intake",
-    location: data.location || "",
+    meeting_type: normalizeEnum(data.meeting_type || data.meetingType, "meetingType") || "Evaluation",
+    location: data.location || "Office",
     status: normalizeEnum(data.status, "appointmentStatus") || "Scheduled",
     notes: data.notes || "",
     client_name: data.client_name || data.clientName || "",
@@ -279,6 +280,27 @@ function toAppointment(data) {
     meetingType: data.meeting_type,
     clientName: data.client_name,
     evaluatorName: data.evaluator_name,
+  });
+}
+
+function fromAppointmentAvailability(id, data) {
+  return {
+    ...data,
+    ...withDates(id, data),
+    day_of_week: Number(data.day_of_week ?? data.dayOfWeek ?? 1),
+    time: data.time || "09:00",
+    duration_minutes: Number(data.duration_minutes || data.durationMinutes || 60),
+    location: data.location || "Office",
+    active: data.active !== false,
+    notes: data.notes || "",
+  };
+}
+
+function toAppointmentAvailability(data) {
+  return compact({
+    ...data,
+    dayOfWeek: data.day_of_week,
+    durationMinutes: data.duration_minutes,
   });
 }
 
@@ -370,6 +392,10 @@ const transforms = {
   User: { fromDb: fromUser, toDb: toUser },
   Client: { fromDb: fromClient, toDb: toClient },
   Appointment: { fromDb: fromAppointment, toDb: toAppointment },
+  AppointmentAvailability: {
+    fromDb: fromAppointmentAvailability,
+    toDb: toAppointmentAvailability,
+  },
   Evaluation: { fromDb: fromEvaluation, toDb: toEvaluation },
   BillingRecord: { fromDb: fromBillingRecord, toDb: toBillingRecord },
   School: { fromDb: identityFromDb, toDb: compact },

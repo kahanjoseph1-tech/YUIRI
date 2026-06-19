@@ -18,7 +18,15 @@ function toLocalInput(iso) {
 }
 
 export default function AppointmentFormDialog({
-  open, onOpenChange, appointment, clients = [], evaluators = [], defaultClientId, onSave,
+  open,
+  onOpenChange,
+  appointment,
+  clients = [],
+  evaluators = [],
+  defaultClientId,
+  defaultDateTime = "",
+  defaultLocation = "Office",
+  onSave,
 }) {
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
@@ -26,12 +34,17 @@ export default function AppointmentFormDialog({
   useEffect(() => {
     if (!open) return;
     setForm(appointment
-      ? { ...appointment, date_time: toLocalInput(appointment.date_time) }
+      ? {
+          ...appointment,
+          date_time: toLocalInput(appointment.date_time),
+          meeting_type: appointment.meeting_type === "Intake" ? "Evaluation" : appointment.meeting_type || "Evaluation",
+          location: appointment.location || "Office",
+        }
       : {
-          client_id: defaultClientId || "", evaluator_id: "", date_time: "",
-          meeting_type: "Intake", location: "", status: "Scheduled", notes: "",
+          client_id: defaultClientId || "", evaluator_id: "", date_time: defaultDateTime,
+          meeting_type: "Evaluation", location: defaultLocation || "Office", status: "Scheduled", notes: "",
         });
-  }, [open, appointment, defaultClientId]);
+  }, [open, appointment, defaultClientId, defaultDateTime, defaultLocation]);
 
   const update = (field, value) => setForm((p) => ({ ...p, [field]: value }));
 
@@ -43,6 +56,8 @@ export default function AppointmentFormDialog({
       await onSave({
         ...form,
         date_time: form.date_time ? new Date(form.date_time).toISOString() : null,
+        meeting_type: form.meeting_type || "Evaluation",
+        location: form.location?.trim() || "Office",
         client_name: client ? `${client.boy_first_name} ${client.boy_last_name}` : form.client_name,
         evaluator_name: evaluator ? (evaluator.full_name || evaluator.email) : form.evaluator_name,
       });
@@ -98,7 +113,7 @@ export default function AppointmentFormDialog({
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs font-medium text-gray-500">Location / Zoom Link</Label>
-            <Input value={form.location || ""} onChange={(e) => update("location", e.target.value)} placeholder="Address or meeting link" />
+            <Input value={form.location || ""} onChange={(e) => update("location", e.target.value)} placeholder="Office" />
           </div>
           {appointment && (
             <div className="space-y-1.5">

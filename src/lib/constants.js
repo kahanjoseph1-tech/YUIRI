@@ -98,7 +98,6 @@ export const ENVIRONMENT_TYPES = [
 
 // ---- Appointment ----
 export const MEETING_TYPES = [
-  "Intake",
   "Evaluation",
   "Follow-Up",
   "Parent Meeting",

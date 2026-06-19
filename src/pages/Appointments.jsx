@@ -1,19 +1,31 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, CalendarDays, List, Calendar as CalendarIcon } from "lucide-react";
+import { Plus, CalendarDays, Clock, List, Calendar as CalendarIcon } from "lucide-react";
 import StatusBadge from "@/components/StatusBadge";
 import AppointmentFormDialog from "@/components/appointments/AppointmentFormDialog";
 import AppointmentCalendar from "@/components/appointments/AppointmentCalendar";
+import AvailabilityDialog from "@/components/appointments/AvailabilityDialog";
+import DayScheduleDialog from "@/components/appointments/DayScheduleDialog";
 import { APPOINTMENT_STATUSES } from "@/lib/constants";
 import { onAppointmentCompleted } from "@/lib/automations";
 import { getEffectiveRole, can } from "@/lib/roles";
 import { useRole } from "@/lib/useRole";
 import { fmtDateTime } from "@/lib/format";
+
+function availabilityPayload(row) {
+  return {
+    day_of_week: Number(row.day_of_week),
+    time: row.time || "09:00",
+    duration_minutes: Number(row.duration_minutes || 60),
+    location: row.location || "Office",
+    active: row.active !== false,
+  };
+}
 
 export default function Appointments() {
   const queryClient = useQueryClient();
@@ -24,7 +36,10 @@ export default function Appointments() {
   const [view, setView] = useState("calendar");
   const [statusFilter, setStatusFilter] = useState("all");
   const [showForm, setShowForm] = useState(false);
+  const [showAvailability, setShowAvailability] = useState(false);
   const [editAppt, setEditAppt] = useState(null);
+  const [selectedDay, setSelectedDay] = useState(null);
+  const [appointmentDefaults, setAppointmentDefaults] = useState(null);
 
   const { data: appointments = [], isLoading } = useQuery({
     queryKey: ["appointments"], queryFn: () => base44.entities.Appointment.list("-date_time", 1000),
@@ -34,6 +49,10 @@ export default function Appointments() {
   });
   const { data: users = [] } = useQuery({
     queryKey: ["users"], queryFn: () => base44.entities.User.list("-created_date", 200),
+  });
+  const { data: availabilitySlots = [] } = useQuery({
+    queryKey: ["appointment-availability"],
+    queryFn: () => base44.entities.AppointmentAvailability.list("day_of_week", 500),
   });
   const evaluators = users.filter((u) => getEffectiveRole(u) === "evaluator" || u.crm_role === "evaluator");
 
@@ -65,10 +84,51 @@ export default function Appointments() {
     onError: () => toast.error("Update failed"),
   });
 
+  const availabilityMutation = useMutation({
+    mutationFn: async (rows) => {
+      const existingIds = new Set(availabilitySlots.map((slot) => slot.id));
+      const nextIds = new Set(rows.filter((row) => row.id).map((row) => row.id));
+      const removals = availabilitySlots
+        .filter((slot) => !nextIds.has(slot.id))
+        .map((slot) => base44.entities.AppointmentAvailability.delete(slot.id));
+      const writes = rows.map((row) => {
+        const payload = availabilityPayload(row);
+        if (row.id && existingIds.has(row.id)) {
+          return base44.entities.AppointmentAvailability.update(row.id, payload);
+        }
+        return base44.entities.AppointmentAvailability.create(payload);
+      });
+      await Promise.all([...removals, ...writes]);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["appointment-availability"] });
+      toast.success("Available slots saved");
+    },
+    onError: () => toast.error("Could not save slots"),
+  });
+
   // Evaluators only see their own appointments.
-  let visible = appointments;
-  if (isEvaluator) visible = visible.filter((a) => a.evaluator_id === user?.id);
+  const roleVisibleAppointments = useMemo(() => {
+    if (isEvaluator) return appointments.filter((a) => a.evaluator_id === user?.id);
+    return appointments;
+  }, [appointments, isEvaluator, user?.id]);
+
+  let visible = roleVisibleAppointments;
   if (statusFilter !== "all") visible = visible.filter((a) => a.status === statusFilter);
+
+  const sortedAvailabilitySlots = useMemo(
+    () => [...availabilitySlots].sort((a, b) => {
+      const dayDiff = Number(a.day_of_week) - Number(b.day_of_week);
+      if (dayDiff !== 0) return dayDiff;
+      return String(a.time || "").localeCompare(String(b.time || ""));
+    }),
+    [availabilitySlots]
+  );
+
+  const openNewAppointment = (defaults = null) => {
+    setAppointmentDefaults(defaults);
+    setShowForm(true);
+  };
 
   return (
     <div className="space-y-6">
@@ -87,7 +147,12 @@ export default function Appointments() {
             </button>
           </div>
           {canWrite && (
-            <Button onClick={() => setShowForm(true)} className="bg-[#1e3a5f] hover:bg-[#1e3a5f]/90 gap-2">
+            <Button variant="outline" onClick={() => setShowAvailability(true)} className="gap-2">
+              <Clock className="w-4 h-4" /> Available Slots
+            </Button>
+          )}
+          {canWrite && (
+            <Button onClick={() => openNewAppointment()} className="bg-[#1e3a5f] hover:bg-[#1e3a5f]/90 gap-2">
               <Plus className="w-4 h-4" /> New Appointment
             </Button>
           )}
@@ -107,7 +172,12 @@ export default function Appointments() {
       {isLoading ? (
         <Skeleton className="h-96 rounded-2xl" />
       ) : view === "calendar" ? (
-        <AppointmentCalendar appointments={visible} onSelect={(a) => (canWrite ? setEditAppt(a) : null)} />
+        <AppointmentCalendar
+          appointments={visible}
+          availabilitySlots={sortedAvailabilitySlots}
+          onSelect={(a) => (canWrite ? setEditAppt(a) : null)}
+          onDaySelect={(day) => setSelectedDay(day)}
+        />
       ) : (
         <div className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-50">
           {visible.length === 0 ? (
@@ -134,12 +204,37 @@ export default function Appointments() {
       <AppointmentFormDialog
         open={showForm} onOpenChange={setShowForm}
         clients={clients} evaluators={evaluators}
+        defaultDateTime={appointmentDefaults?.date_time || ""}
+        defaultLocation={appointmentDefaults?.location || "Office"}
         onSave={(data) => createMutation.mutateAsync(data)}
       />
       <AppointmentFormDialog
         open={!!editAppt} onOpenChange={() => setEditAppt(null)}
         appointment={editAppt} clients={clients} evaluators={evaluators}
         onSave={(data) => updateMutation.mutateAsync({ id: editAppt.id, data, prev: editAppt })}
+      />
+      <DayScheduleDialog
+        open={!!selectedDay}
+        onOpenChange={(open) => !open && setSelectedDay(null)}
+        day={selectedDay}
+        appointments={roleVisibleAppointments}
+        availabilitySlots={sortedAvailabilitySlots}
+        canWrite={canWrite}
+        onEdit={(appointment) => {
+          setSelectedDay(null);
+          setEditAppt(appointment);
+        }}
+        onSchedule={(defaults) => {
+          setSelectedDay(null);
+          openNewAppointment(defaults);
+        }}
+      />
+      <AvailabilityDialog
+        open={showAvailability}
+        onOpenChange={setShowAvailability}
+        slots={sortedAvailabilitySlots}
+        saving={availabilityMutation.isPending}
+        onSave={(rows) => availabilityMutation.mutateAsync(rows)}
       />
     </div>
   );
