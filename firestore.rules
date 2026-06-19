@@ -6,8 +6,94 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    match /{document=**} {
-      allow read, write: if signedIn();
+    function currentUserPath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+
+    function currentUserIsApproved() {
+      return signedIn()
+        && exists(currentUserPath())
+        && get(currentUserPath()).data.approval_status == "approved";
+    }
+
+    function currentUserIsAdmin() {
+      return currentUserIsApproved()
+        && get(currentUserPath()).data.crm_role == "admin";
+    }
+
+    function isBootstrapAdmin() {
+      return signedIn() && request.auth.token.email == "kahanjoseph1@gmail.com";
+    }
+
+    function validUserCreate(userId) {
+      return signedIn()
+        && request.auth.uid == userId
+        && !exists(/databases/$(database)/documents/users/$(userId))
+        && request.resource.data.keys().hasOnly([
+          "email",
+          "full_name",
+          "name",
+          "crm_role",
+          "firebase_uid",
+          "approval_status",
+          "created_date",
+          "updated_date"
+        ])
+        && request.resource.data.firebase_uid == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
+        && (
+          (
+            isBootstrapAdmin()
+            && request.resource.data.crm_role == "admin"
+            && request.resource.data.approval_status == "approved"
+          )
+          ||
+          (
+            request.resource.data.crm_role == "user"
+            && request.resource.data.approval_status == "pending"
+          )
+        );
+    }
+
+    function validUserUpdate() {
+      return request.resource.data.crm_role in ["admin", "user"]
+        && request.resource.data.approval_status in ["approved", "pending"];
+    }
+
+    match /users/{userId} {
+      allow get: if currentUserIsApproved() || (signedIn() && request.auth.uid == userId);
+      allow list: if currentUserIsApproved();
+      allow create: if validUserCreate(userId);
+      allow update: if currentUserIsAdmin() && validUserUpdate();
+      allow delete: if currentUserIsAdmin();
+    }
+
+    match /clients/{document} {
+      allow read, write: if currentUserIsApproved();
+    }
+
+    match /appointments/{document} {
+      allow read, write: if currentUserIsApproved();
+    }
+
+    match /appointment_availability/{document} {
+      allow read, write: if currentUserIsApproved();
+    }
+
+    match /evaluations/{document} {
+      allow read, write: if currentUserIsApproved();
+    }
+
+    match /billing/{document} {
+      allow read, write: if currentUserIsApproved();
+    }
+
+    match /schools/{document} {
+      allow read, write: if currentUserIsApproved();
+    }
+
+    match /placements/{document} {
+      allow read, write: if currentUserIsApproved();
     }
   }
 }

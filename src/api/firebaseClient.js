@@ -5,6 +5,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  setDoc,
   updateDoc,
 } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
@@ -20,6 +21,8 @@ const collectionNames = {
   School: "schools",
   Placement: "placements",
 };
+
+const bootstrapAdminEmails = new Set(["kahanjoseph1@gmail.com"]);
 
 function compact(value) {
   if (Array.isArray(value)) return value.map(compact);
@@ -79,7 +82,7 @@ function fromUser(id, data) {
     crm_role: role,
     role,
     firebase_uid: data.firebase_uid || "",
-    approval_status: data.approval_status || "approved",
+    approval_status: data.approval_status || "pending",
   };
 }
 
@@ -90,7 +93,7 @@ function toUser(data) {
     name: data.name || data.full_name,
     crm_role: normalizeRole(data.crm_role || data.role),
     firebase_uid: data.firebase_uid,
-    approval_status: data.approval_status || "approved",
+    approval_status: data.approval_status,
   });
 }
 
@@ -430,46 +433,37 @@ function waitForFirebaseUser() {
 }
 
 async function ensureUserRecord(firebaseUser) {
+  if (!firebaseUser?.uid) return null;
+
   const email = firebaseUser.email || "";
   const displayName = firebaseUser.displayName || email || "User";
+  const ref = doc(db, collectionNames.User, firebaseUser.uid);
+  const emailKey = email.toLowerCase();
 
   try {
-    const users = await entities.User.list("-created_date", 500);
-    const existing = users.find(
-      (user) => user.email?.toLowerCase() === email.toLowerCase()
-    );
-    const hasAdmin = users.some((user) => normalizeRole(user.crm_role) === "admin");
-    if (existing) {
-      if (!hasAdmin && normalizeRole(existing.crm_role) !== "admin") {
-        return entities.User.update(existing.id, {
-          crm_role: "admin",
-          approval_status: "approved",
-        });
-      }
-      return existing;
+    const snapshot = await getDoc(ref);
+    if (snapshot.exists()) {
+      return fromUser(snapshot.id, snapshot.data());
     }
 
-    const crm_role = hasAdmin ? "user" : "admin";
-    return entities.User.create({
+    const isBootstrapAdmin = bootstrapAdminEmails.has(emailKey);
+    const now = new Date().toISOString();
+    const payload = compact({
       email,
       full_name: displayName,
       name: displayName,
-      crm_role,
+      crm_role: isBootstrapAdmin ? "admin" : "user",
       firebase_uid: firebaseUser.uid,
-      approval_status: hasAdmin ? "pending" : "approved",
+      approval_status: isBootstrapAdmin ? "approved" : "pending",
+      created_date: now,
+      updated_date: now,
     });
+
+    await setDoc(ref, payload);
+    return fromUser(firebaseUser.uid, payload);
   } catch (error) {
-    console.warn("Unable to sync Firebase user record:", error);
-    return {
-      id: firebaseUser.uid,
-      email,
-      full_name: displayName,
-      name: displayName,
-      crm_role: "admin",
-      role: "admin",
-      approval_status: "approved",
-      firebase_uid: firebaseUser.uid,
-    };
+    console.error("Unable to sync Firebase user record:", error);
+    throw new Error("Unable to sync your Yuiri user record. Please refresh or contact an admin.");
   }
 }
 

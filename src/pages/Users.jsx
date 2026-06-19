@@ -54,7 +54,7 @@ export default function Users() {
                 <TableRow key={u.id}>
                   <TableCell className="font-medium text-gray-900">{u.full_name || u.name || "—"}</TableCell>
                   <TableCell className="text-gray-500">{u.email}</TableCell>
-                  <TableCell className="text-gray-500 capitalize">{u.approval_status || "approved"}</TableCell>
+                  <TableCell className="text-gray-500 capitalize">{u.approval_status || "pending"}</TableCell>
                   <TableCell>
                     <Select
                       value={getEffectiveRole(u)}
@@ -67,7 +67,7 @@ export default function Users() {
                     </Select>
                   </TableCell>
                   <TableCell className="text-right">
-                    {(u.approval_status || "approved") === "pending" ? (
+                    {(u.approval_status || "pending") === "pending" ? (
                       <Button
                         size="sm"
                         onClick={() => updateUser.mutate({

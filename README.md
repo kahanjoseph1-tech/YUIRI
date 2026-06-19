@@ -49,5 +49,7 @@ and writes clean Firestore collections:
 - `placements`
 
 The adapter stores canonical snake_case fields only. The first signed-in user
-created in a fresh database becomes `admin`; later signups are created as
-pending `user` records until approved by an admin.
+for `kahanjoseph1@gmail.com` is bootstrapped as `admin`; later signups are
+created as pending `user` records until approved by an admin. User records are
+stored at `users/{firebase_uid}` so Firestore rules and app roles use the same
+identity.

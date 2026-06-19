@@ -67,7 +67,7 @@ export default function ClientDetail() {
   });
 
   const client = clients.find((c) => c.id === id);
-  const evaluators = users.filter((u) => (u.approval_status || "approved") === "approved");
+  const evaluators = users.filter((u) => u.approval_status === "approved");
 
   const updateMutation = useMutation({
     mutationFn: ({ data }) => firebaseClient.entities.Client.update(id, data),

@@ -55,7 +55,7 @@ export default function Clients() {
   const { data: users = [] } = useQuery({
     queryKey: ["users"], queryFn: () => firebaseClient.entities.User.list("-created_date", 200),
   });
-  const evaluators = users.filter((u) => (u.approval_status || "approved") === "approved");
+  const evaluators = users.filter((u) => u.approval_status === "approved");
 
   const createMutation = useMutation({
     mutationFn: (data) => firebaseClient.entities.Client.create(data),

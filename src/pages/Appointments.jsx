@@ -53,7 +53,7 @@ export default function Appointments() {
     queryKey: ["appointment-availability"],
     queryFn: () => firebaseClient.entities.AppointmentAvailability.list("day_of_week", 500),
   });
-  const evaluators = users.filter((u) => (u.approval_status || "approved") === "approved");
+  const evaluators = users.filter((u) => u.approval_status === "approved");
 
   const createMutation = useMutation({
     mutationFn: (data) => firebaseClient.entities.Appointment.create(data),
