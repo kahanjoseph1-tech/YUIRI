@@ -14,6 +14,19 @@ const DROPDOWN_OPTIONS_DOC = "dropdown_options";
 
 export const DROPDOWN_OPTIONS_QUERY_KEY = ["settings", "dropdown_options"];
 
+const DEFAULT_EVALUATION_FARTAGS_OPTIONS = ["רוב", "חלק", "כמעט נישט"];
+const DEFAULT_EVALUATION_DAVENING_OPTIONS = ["מצוין", "טוב מאוד", "טוב"];
+const DEFAULT_EVALUATION_LEARNING_OPTIONS = ["מצוין", "טוב מאוד", "טוב", "חלוש"];
+const DEFAULT_EVALUATION_FRIENDS_OPTIONS = ["1", "2", "3", "4", "5", "Other"];
+const DEFAULT_EVALUATION_CHAVRUSAS_OPTIONS = ["נארמאל", "געפלאגט", "אינגערמאן", "Other"];
+const DEFAULT_EVALUATION_YES_NO_OTHER_OPTIONS = ["יא", "ניין", "Other"];
+const DEFAULT_EVALUATION_VIDEO_OPTIONS = ["קוקט נישט", "אביסל", "אסאך", "Other"];
+const DEFAULT_EVALUATION_SMARTPHONE_OPTIONS = ["ניין", "יא", "געהאט", "Other"];
+const DEFAULT_EVALUATION_EMOTIONAL_OPTIONS = ["יא", "אביסל", "ניין", "Other"];
+const DEFAULT_EVALUATION_MIDOS_OPTIONS = ["פיינע", "קען זיין בעסער", "Other"];
+const DEFAULT_EVALUATION_DERECH_ERETZ_OPTIONS = ["יא", "ניין", "קען זיין בעסער"];
+const DEFAULT_EVALUATION_BILLING_ANSWERS = ["געברענגט געלט", "דארף מען בילן", "נישט זיכער"];
+
 export const DROPDOWN_SECTIONS = [
   {
     key: "clients",
@@ -37,6 +50,27 @@ export const DROPDOWN_SECTIONS = [
       "appointment_locations",
     ],
   },
+  {
+    key: "evaluations",
+    label: "Evaluations",
+    groupKeys: [
+      "evaluation_fartags_options",
+      "evaluation_davening_options",
+      "evaluation_learning_options",
+      "evaluation_friends_options",
+      "evaluation_chavrusas_options",
+      "evaluation_dormitory_options",
+      "evaluation_video_options",
+      "evaluation_smartphone_options",
+      "evaluation_emotional_options",
+      "evaluation_midos_options",
+      "evaluation_derech_eretz_options",
+      "evaluation_strengthened_learning_davening_options",
+      "evaluation_bad_friend_strengthened_options",
+      "evaluation_likes_music_options",
+      "evaluation_billing_answers",
+    ],
+  },
 ];
 
 export const DROPDOWN_GROUPS = [
@@ -50,6 +84,29 @@ export const DROPDOWN_GROUPS = [
   { key: "meeting_types", label: "Appointment type", section: "scheduling" },
   { key: "appointment_statuses", label: "Appointment status", section: "scheduling" },
   { key: "appointment_locations", label: "Location presets", section: "scheduling" },
+  { key: "evaluation_fartags_options", label: "פארטאגס", section: "evaluations" },
+  { key: "evaluation_davening_options", label: "דאווענען", section: "evaluations" },
+  { key: "evaluation_learning_options", label: "לערנען", section: "evaluations" },
+  { key: "evaluation_friends_options", label: "חברים", section: "evaluations" },
+  { key: "evaluation_chavrusas_options", label: "חברותה'ס", section: "evaluations" },
+  { key: "evaluation_dormitory_options", label: "דארמאטארי", section: "evaluations" },
+  { key: "evaluation_video_options", label: "קוקט ווידיאויס", section: "evaluations" },
+  { key: "evaluation_smartphone_options", label: "האסט א סמארטפאון", section: "evaluations" },
+  { key: "evaluation_emotional_options", label: "געפילישער", section: "evaluations" },
+  { key: "evaluation_midos_options", label: "מידות", section: "evaluations" },
+  { key: "evaluation_derech_eretz_options", label: "דרך ארץ'דיגע", section: "evaluations" },
+  {
+    key: "evaluation_strengthened_learning_davening_options",
+    label: "נישט געהאט קיין נערוון צו לערנען אדער דאווענען און זיך געשטארקט",
+    section: "evaluations",
+  },
+  {
+    key: "evaluation_bad_friend_strengthened_options",
+    label: "א חבר גערעדט נישט גוטע זאכן און זיך געשטארקט",
+    section: "evaluations",
+  },
+  { key: "evaluation_likes_music_options", label: "האט ליב מוזיק", section: "evaluations" },
+  { key: "evaluation_billing_answers", label: "באצאלט / בילינג", section: "evaluations" },
 ];
 
 export const DEFAULT_DROPDOWN_OPTIONS = {
@@ -63,6 +120,21 @@ export const DEFAULT_DROPDOWN_OPTIONS = {
   meeting_types: MEETING_TYPES,
   appointment_statuses: APPOINTMENT_STATUSES,
   appointment_locations: ["Office"],
+  evaluation_fartags_options: DEFAULT_EVALUATION_FARTAGS_OPTIONS,
+  evaluation_davening_options: DEFAULT_EVALUATION_DAVENING_OPTIONS,
+  evaluation_learning_options: DEFAULT_EVALUATION_LEARNING_OPTIONS,
+  evaluation_friends_options: DEFAULT_EVALUATION_FRIENDS_OPTIONS,
+  evaluation_chavrusas_options: DEFAULT_EVALUATION_CHAVRUSAS_OPTIONS,
+  evaluation_dormitory_options: DEFAULT_EVALUATION_YES_NO_OTHER_OPTIONS,
+  evaluation_video_options: DEFAULT_EVALUATION_VIDEO_OPTIONS,
+  evaluation_smartphone_options: DEFAULT_EVALUATION_SMARTPHONE_OPTIONS,
+  evaluation_emotional_options: DEFAULT_EVALUATION_EMOTIONAL_OPTIONS,
+  evaluation_midos_options: DEFAULT_EVALUATION_MIDOS_OPTIONS,
+  evaluation_derech_eretz_options: DEFAULT_EVALUATION_DERECH_ERETZ_OPTIONS,
+  evaluation_strengthened_learning_davening_options: DEFAULT_EVALUATION_YES_NO_OTHER_OPTIONS,
+  evaluation_bad_friend_strengthened_options: DEFAULT_EVALUATION_YES_NO_OTHER_OPTIONS,
+  evaluation_likes_music_options: DEFAULT_EVALUATION_YES_NO_OTHER_OPTIONS,
+  evaluation_billing_answers: DEFAULT_EVALUATION_BILLING_ANSWERS,
 };
 
 export function uniqueOptions(options) {

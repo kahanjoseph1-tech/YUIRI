@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,35 +7,43 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  DEFAULT_DROPDOWN_OPTIONS,
+  DROPDOWN_OPTIONS_QUERY_KEY,
+  getDropdownOptions,
+  uniqueOptions,
+} from "@/lib/dropdownSettings";
 
 const OTHER_OPTION = "Other";
 
 const singleChoiceQuestions = [
-  { key: "fartags", label: "פארטאגס", options: ["רוב", "חלק", "כמעט נישט"] },
-  { key: "davening", label: "דאווענען", options: ["מצוין", "טוב מאוד", "טוב"] },
-  { key: "learning", label: "לערנען", options: ["מצוין", "טוב מאוד", "טוב", "חלוש"] },
+  { key: "fartags", settingsKey: "evaluation_fartags_options", label: "פארטאגס", options: ["רוב", "חלק", "כמעט נישט"] },
+  { key: "davening", settingsKey: "evaluation_davening_options", label: "דאווענען", options: ["מצוין", "טוב מאוד", "טוב"] },
+  { key: "learning", settingsKey: "evaluation_learning_options", label: "לערנען", options: ["מצוין", "טוב מאוד", "טוב", "חלוש"] },
 ];
 
 const checkboxQuestions = [
-  { key: "friends", label: "חברים", options: ["1", "2", "3", "4", "5", OTHER_OPTION] },
-  { key: "chavrusas", label: "חברותה'ס", options: ["נארמאל", "געפלאגט", "אינגערמאן", OTHER_OPTION] },
-  { key: "dormitory", label: "דארמאטארי", options: ["יא", "ניין", OTHER_OPTION] },
-  { key: "watches_videos", label: "קוקט ווידיאויס", options: ["קוקט נישט", "אביסל", "אסאך", OTHER_OPTION] },
-  { key: "smartphone", label: "האסט א סמארטפאון", options: ["ניין", "יא", "געהאט", OTHER_OPTION] },
-  { key: "emotional", label: "געפילישער", options: ["יא", "אביסל", "ניין", OTHER_OPTION] },
-  { key: "midos", label: "מידות", options: ["פיינע", "קען זיין בעסער", OTHER_OPTION] },
-  { key: "derech_eretz", label: "דרך ארץ'דיגע", options: ["יא", "ניין", "קען זיין בעסער"] },
+  { key: "friends", settingsKey: "evaluation_friends_options", label: "חברים", options: ["1", "2", "3", "4", "5", OTHER_OPTION] },
+  { key: "chavrusas", settingsKey: "evaluation_chavrusas_options", label: "חברותה'ס", options: ["נארמאל", "געפלאגט", "אינגערמאן", OTHER_OPTION] },
+  { key: "dormitory", settingsKey: "evaluation_dormitory_options", label: "דארמאטארי", options: ["יא", "ניין", OTHER_OPTION] },
+  { key: "watches_videos", settingsKey: "evaluation_video_options", label: "קוקט ווידיאויס", options: ["קוקט נישט", "אביסל", "אסאך", OTHER_OPTION] },
+  { key: "smartphone", settingsKey: "evaluation_smartphone_options", label: "האסט א סמארטפאון", options: ["ניין", "יא", "געהאט", OTHER_OPTION] },
+  { key: "emotional", settingsKey: "evaluation_emotional_options", label: "געפילישער", options: ["יא", "אביסל", "ניין", OTHER_OPTION] },
+  { key: "midos", settingsKey: "evaluation_midos_options", label: "מידות", options: ["פיינע", "קען זיין בעסער", OTHER_OPTION] },
+  { key: "derech_eretz", settingsKey: "evaluation_derech_eretz_options", label: "דרך ארץ'דיגע", options: ["יא", "ניין", "קען זיין בעסער"] },
   {
     key: "strengthened_learning_davening",
+    settingsKey: "evaluation_strengthened_learning_davening_options",
     label: "נישט געהאט קיין נערוון צו לערנען אדער דאווענען און זיך געשטארקט",
     options: ["יא", "ניין", OTHER_OPTION],
   },
   {
     key: "bad_friend_strengthened",
+    settingsKey: "evaluation_bad_friend_strengthened_options",
     label: "א חבר גערעדט נישט גוטע זאכן און זיך געשטארקט",
     options: ["יא", "ניין", OTHER_OPTION],
   },
-  { key: "likes_music", label: "האט ליב מוזיק", options: ["יא", "ניין", OTHER_OPTION] },
+  { key: "likes_music", settingsKey: "evaluation_likes_music_options", label: "האט ליב מוזיק", options: ["יא", "ניין", OTHER_OPTION] },
 ];
 
 const longAnswerQuestions = [
@@ -45,8 +54,6 @@ const longAnswerQuestions = [
   { key: "reason_switching_yeshiva", label: "סיבה פון טוישען ישיבה" },
   { key: "notes", label: "הערות" },
 ];
-
-const billingAnswers = ["געברענגט געלט", "דארף מען בילן", "נישט זיכער"];
 
 function defaultQuestionnaire() {
   const defaults = {};
@@ -80,11 +87,30 @@ export default function EvaluationFormDialog({ open, onOpenChange, evaluation, o
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
 
+  const { data: dropdownOptions = DEFAULT_DROPDOWN_OPTIONS } = useQuery({
+    queryKey: DROPDOWN_OPTIONS_QUERY_KEY,
+    queryFn: getDropdownOptions,
+  });
+
   const blankQuestionnaire = useMemo(() => defaultQuestionnaire(), []);
   const questionnaire = useMemo(
     () => ({ ...blankQuestionnaire, ...(form.questionnaire || {}) }),
     [blankQuestionnaire, form.questionnaire]
   );
+
+  const optionsForQuestion = (question) => {
+    const savedValue = questionnaire[question.key];
+    const savedOptions = Array.isArray(savedValue) ? savedValue : [savedValue];
+    return uniqueOptions([
+      ...(dropdownOptions[question.settingsKey] || question.options || []),
+      ...savedOptions,
+    ]);
+  };
+
+  const billingAnswerOptions = uniqueOptions([
+    ...(dropdownOptions.evaluation_billing_answers || DEFAULT_DROPDOWN_OPTIONS.evaluation_billing_answers || []),
+    form.evaluation_billing_answer,
+  ]);
 
   useEffect(() => {
     if (open) {
@@ -155,7 +181,7 @@ export default function EvaluationFormDialog({ open, onOpenChange, evaluation, o
                     <SelectValue placeholder="קלייב אויס" />
                   </SelectTrigger>
                   <SelectContent>
-                    {question.options.map((option) => (
+                    {optionsForQuestion(question).map((option) => (
                       <SelectItem key={option} value={option} className="text-right" dir="rtl">
                         {option}
                       </SelectItem>
@@ -169,13 +195,14 @@ export default function EvaluationFormDialog({ open, onOpenChange, evaluation, o
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4" dir="rtl">
             {checkboxQuestions.map((question) => {
               const selected = asArray(questionnaire[question.key]);
+              const questionOptions = optionsForQuestion(question);
               const hasOther = selected.includes(OTHER_OPTION);
 
               return (
                 <Field key={question.key} label={question.label} full={question.label.length > 35}>
                   <div className="rounded-md border border-gray-100 p-3">
                     <div className="flex flex-wrap gap-3">
-                      {question.options.map((option) => (
+                      {questionOptions.map((option) => (
                         <label key={option} className="flex items-center gap-2 text-sm text-gray-700">
                           <Checkbox
                             checked={selected.includes(option)}
@@ -225,7 +252,7 @@ export default function EvaluationFormDialog({ open, onOpenChange, evaluation, o
                     <SelectValue placeholder="Select billing answer" />
                   </SelectTrigger>
                   <SelectContent>
-                    {billingAnswers.map((answer) => (
+                    {billingAnswerOptions.map((answer) => (
                       <SelectItem key={answer} value={answer}>{answer}</SelectItem>
                     ))}
                   </SelectContent>
