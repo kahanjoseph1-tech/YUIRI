@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { firebaseClient } from "@/api/firebaseClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -51,36 +51,36 @@ export default function ClientDetail() {
   const [billOpen, setBillOpen] = useState(false);
 
   const { data: clients = [], isLoading } = useQuery({
-    queryKey: ["clients"], queryFn: () => base44.entities.Client.list("-created_date", 1000),
+    queryKey: ["clients"], queryFn: () => firebaseClient.entities.Client.list("-created_date", 1000),
   });
   const { data: appointments = [] } = useQuery({
-    queryKey: ["appointments"], queryFn: () => base44.entities.Appointment.list("-date_time", 1000),
+    queryKey: ["appointments"], queryFn: () => firebaseClient.entities.Appointment.list("-date_time", 1000),
   });
   const { data: evaluations = [] } = useQuery({
-    queryKey: ["evaluations"], queryFn: () => base44.entities.Evaluation.list("-created_date", 1000),
+    queryKey: ["evaluations"], queryFn: () => firebaseClient.entities.Evaluation.list("-created_date", 1000),
   });
   const { data: billing = [] } = useQuery({
-    queryKey: ["billing"], queryFn: () => base44.entities.BillingRecord.list("-created_date", 1000),
+    queryKey: ["billing"], queryFn: () => firebaseClient.entities.BillingRecord.list("-created_date", 1000),
   });
   const { data: users = [] } = useQuery({
-    queryKey: ["users"], queryFn: () => base44.entities.User.list("-created_date", 200),
+    queryKey: ["users"], queryFn: () => firebaseClient.entities.User.list("-created_date", 200),
   });
 
   const client = clients.find((c) => c.id === id);
   const evaluators = users.filter((u) => (u.approval_status || "approved") === "approved");
 
   const updateMutation = useMutation({
-    mutationFn: ({ data }) => base44.entities.Client.update(id, data),
+    mutationFn: ({ data }) => firebaseClient.entities.Client.update(id, data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["clients"] }); toast.success("Client updated"); },
     onError: () => toast.error("Update failed"),
   });
   const createAppt = useMutation({
-    mutationFn: (data) => base44.entities.Appointment.create(data),
+    mutationFn: (data) => firebaseClient.entities.Appointment.create(data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["appointments"] }); toast.success("Appointment scheduled"); },
     onError: () => toast.error("Failed to schedule"),
   });
   const createBill = useMutation({
-    mutationFn: (data) => base44.entities.BillingRecord.create(data),
+    mutationFn: (data) => firebaseClient.entities.BillingRecord.create(data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["billing"] }); toast.success("Billing record created"); },
     onError: () => toast.error("Failed to create record"),
   });

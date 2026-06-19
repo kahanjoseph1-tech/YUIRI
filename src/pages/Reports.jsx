@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { base44 } from "@/api/base44Client";
+import { firebaseClient } from "@/api/firebaseClient";
 import { useQuery } from "@tanstack/react-query";
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
@@ -24,12 +24,12 @@ function ChartCard({ title, children }) {
 }
 
 export default function Reports() {
-  const { data: clients = [], isLoading: l1 } = useQuery({ queryKey: ["clients"], queryFn: () => base44.entities.Client.list("-created_date", 1000) });
-  const { data: appointments = [], isLoading: l2 } = useQuery({ queryKey: ["appointments"], queryFn: () => base44.entities.Appointment.list("-date_time", 1000) });
-  const { data: evaluations = [], isLoading: l3 } = useQuery({ queryKey: ["evaluations"], queryFn: () => base44.entities.Evaluation.list("-created_date", 1000) });
-  const { data: billing = [], isLoading: l4 } = useQuery({ queryKey: ["billing"], queryFn: () => base44.entities.BillingRecord.list("-created_date", 1000) });
-  const { data: placements = [], isLoading: l5 } = useQuery({ queryKey: ["placements"], queryFn: () => base44.entities.Placement.list("-created_date", 1000) });
-  const { data: schools = [] } = useQuery({ queryKey: ["schools"], queryFn: () => base44.entities.School.list("-created_date", 1000) });
+  const { data: clients = [], isLoading: l1 } = useQuery({ queryKey: ["clients"], queryFn: () => firebaseClient.entities.Client.list("-created_date", 1000) });
+  const { data: appointments = [], isLoading: l2 } = useQuery({ queryKey: ["appointments"], queryFn: () => firebaseClient.entities.Appointment.list("-date_time", 1000) });
+  const { data: evaluations = [], isLoading: l3 } = useQuery({ queryKey: ["evaluations"], queryFn: () => firebaseClient.entities.Evaluation.list("-created_date", 1000) });
+  const { data: billing = [], isLoading: l4 } = useQuery({ queryKey: ["billing"], queryFn: () => firebaseClient.entities.BillingRecord.list("-created_date", 1000) });
+  const { data: placements = [], isLoading: l5 } = useQuery({ queryKey: ["placements"], queryFn: () => firebaseClient.entities.Placement.list("-created_date", 1000) });
+  const { data: schools = [] } = useQuery({ queryKey: ["schools"], queryFn: () => firebaseClient.entities.School.list("-created_date", 1000) });
 
   const loading = l1 || l2 || l3 || l4 || l5;
 

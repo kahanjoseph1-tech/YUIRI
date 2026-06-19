@@ -6,7 +6,7 @@ import {
   signInWithEmailAndPassword,
   signInWithPopup,
 } from "firebase/auth";
-import { base44 } from "@/api/base44Client";
+import { firebaseClient } from "@/api/firebaseClient";
 import { auth as firebaseAuth } from "@/lib/firebase";
 
 const AuthContext = createContext();
@@ -30,7 +30,7 @@ export const AuthProvider = ({ children }) => {
       }
 
       try {
-        const currentUser = await base44.auth.me();
+        const currentUser = await firebaseClient.auth.me();
         setUser(currentUser);
         setIsAuthenticated(Boolean(currentUser));
       } catch (error) {
@@ -60,7 +60,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
-    await base44.auth.logout();
+    await firebaseClient.auth.logout();
     setUser(null);
     setIsAuthenticated(false);
   };

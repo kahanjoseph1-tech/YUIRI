@@ -98,7 +98,7 @@ export default function ClientFormDrawer({ open, onOpenChange, client, evaluator
         ? {
             ...EMPTY,
             ...client,
-            status: client.status === "New Lead" ? "New Client" : client.status || "New Client",
+            status: client.status || "New Client",
             caller_source: client.caller_source || client.referral_source || "",
             responsible_person: client.responsible_person || assignedEvaluatorName || "",
           }

@@ -1,5 +1,5 @@
 import React from "react";
-import { base44 } from "@/api/base44Client";
+import { firebaseClient } from "@/api/firebaseClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -14,11 +14,11 @@ export default function Users() {
   const queryClient = useQueryClient();
 
   const { data: users = [], isLoading } = useQuery({
-    queryKey: ["users"], queryFn: () => base44.entities.User.list("-created_date", 500),
+    queryKey: ["users"], queryFn: () => firebaseClient.entities.User.list("-created_date", 500),
   });
 
   const updateUser = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.User.update(id, data),
+    mutationFn: ({ id, data }) => firebaseClient.entities.User.update(id, data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["users"] }); toast.success("User updated"); },
     onError: () => toast.error("Failed to update user"),
   });

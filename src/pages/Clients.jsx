@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { base44 } from "@/api/base44Client";
+import { firebaseClient } from "@/api/firebaseClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -17,10 +17,6 @@ import { can } from "@/lib/roles";
 import { useRole } from "@/lib/useRole";
 
 const PAGE_SIZE = 12;
-
-function normalizeStatus(value) {
-  return value === "New Lead" ? "New Client" : value;
-}
 
 function phoneLabel(phone) {
   if (!phone) return "";
@@ -46,7 +42,7 @@ export default function Clients() {
   const queryClient = useQueryClient();
 
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState(normalizeStatus(params.get("status")) || "all");
+  const [status, setStatus] = useState(params.get("status") || "all");
   const [readyOnly] = useState(params.get("ready") === "1");
   const [sort, setSort] = useState({ key: "boy_last_name", dir: "asc" });
   const [page, setPage] = useState(1);
@@ -54,15 +50,15 @@ export default function Clients() {
   const [editClient, setEditClient] = useState(null);
 
   const { data: clients = [], isLoading } = useQuery({
-    queryKey: ["clients"], queryFn: () => base44.entities.Client.list("-created_date", 1000),
+    queryKey: ["clients"], queryFn: () => firebaseClient.entities.Client.list("-created_date", 1000),
   });
   const { data: users = [] } = useQuery({
-    queryKey: ["users"], queryFn: () => base44.entities.User.list("-created_date", 200),
+    queryKey: ["users"], queryFn: () => firebaseClient.entities.User.list("-created_date", 200),
   });
   const evaluators = users.filter((u) => (u.approval_status || "approved") === "approved");
 
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.Client.create(data),
+    mutationFn: (data) => firebaseClient.entities.Client.create(data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["clients"] }); toast.success("Client added"); },
     onError: (error) => {
       console.error("Failed to add client:", error);
@@ -70,7 +66,7 @@ export default function Clients() {
     },
   });
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Client.update(id, data),
+    mutationFn: ({ id, data }) => firebaseClient.entities.Client.update(id, data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["clients"] }); toast.success("Client updated"); },
     onError: (error) => {
       console.error("Failed to update client:", error);
@@ -82,7 +78,7 @@ export default function Clients() {
     let rows = clients.filter((c) => {
       const name = `${c.client_id || ""} ${c.boy_first_name || ""} ${c.boy_last_name || ""} ${c.father_name || ""} ${c.mother_name || ""} ${c.caller_source || ""} ${c.responsible_person || ""}`.toLowerCase();
       if (search && !name.includes(search.toLowerCase())) return false;
-      if (status !== "all" && normalizeStatus(c.status) !== status) return false;
+      if (status !== "all" && c.status !== status) return false;
       if (readyOnly && !c.ready_to_bill) return false;
       return true;
     });

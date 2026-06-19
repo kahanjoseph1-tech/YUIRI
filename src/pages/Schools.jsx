@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { base44 } from "@/api/base44Client";
+import { firebaseClient } from "@/api/firebaseClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -29,19 +29,19 @@ export default function Schools() {
   const [viewSchool, setViewSchool] = useState(null);
 
   const { data: schools = [], isLoading } = useQuery({
-    queryKey: ["schools"], queryFn: () => base44.entities.School.list("-created_date", 1000),
+    queryKey: ["schools"], queryFn: () => firebaseClient.entities.School.list("-created_date", 1000),
   });
   const { data: placements = [] } = useQuery({
-    queryKey: ["placements"], queryFn: () => base44.entities.Placement.list("-created_date", 1000),
+    queryKey: ["placements"], queryFn: () => firebaseClient.entities.Placement.list("-created_date", 1000),
   });
 
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.School.create(data),
+    mutationFn: (data) => firebaseClient.entities.School.create(data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["schools"] }); toast.success("School added"); },
     onError: () => toast.error("Failed to add"),
   });
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.School.update(id, data),
+    mutationFn: ({ id, data }) => firebaseClient.entities.School.update(id, data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["schools"] }); toast.success("School updated"); },
     onError: () => toast.error("Failed to update"),
   });

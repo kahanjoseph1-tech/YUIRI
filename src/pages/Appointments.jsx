@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { firebaseClient } from "@/api/firebaseClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -41,29 +41,29 @@ export default function Appointments() {
   const [appointmentDefaults, setAppointmentDefaults] = useState(null);
 
   const { data: appointments = [], isLoading } = useQuery({
-    queryKey: ["appointments"], queryFn: () => base44.entities.Appointment.list("-date_time", 1000),
+    queryKey: ["appointments"], queryFn: () => firebaseClient.entities.Appointment.list("-date_time", 1000),
   });
   const { data: clients = [] } = useQuery({
-    queryKey: ["clients"], queryFn: () => base44.entities.Client.list("-created_date", 1000),
+    queryKey: ["clients"], queryFn: () => firebaseClient.entities.Client.list("-created_date", 1000),
   });
   const { data: users = [] } = useQuery({
-    queryKey: ["users"], queryFn: () => base44.entities.User.list("-created_date", 200),
+    queryKey: ["users"], queryFn: () => firebaseClient.entities.User.list("-created_date", 200),
   });
   const { data: availabilitySlots = [] } = useQuery({
     queryKey: ["appointment-availability"],
-    queryFn: () => base44.entities.AppointmentAvailability.list("day_of_week", 500),
+    queryFn: () => firebaseClient.entities.AppointmentAvailability.list("day_of_week", 500),
   });
   const evaluators = users.filter((u) => (u.approval_status || "approved") === "approved");
 
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.Appointment.create(data),
+    mutationFn: (data) => firebaseClient.entities.Appointment.create(data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["appointments"] }); toast.success("Appointment created"); },
     onError: () => toast.error("Failed to create"),
   });
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data, prev }) => {
-      const updated = await base44.entities.Appointment.update(id, data);
+      const updated = await firebaseClient.entities.Appointment.update(id, data);
       // Automation: status -> Completed creates an Evaluation + moves client to Evaluating.
       if (data.status === "Completed" && prev?.status !== "Completed") {
         await onAppointmentCompleted({ ...prev, ...data, id });
@@ -89,13 +89,13 @@ export default function Appointments() {
       const nextIds = new Set(rows.filter((row) => row.id).map((row) => row.id));
       const removals = availabilitySlots
         .filter((slot) => !nextIds.has(slot.id))
-        .map((slot) => base44.entities.AppointmentAvailability.delete(slot.id));
+        .map((slot) => firebaseClient.entities.AppointmentAvailability.delete(slot.id));
       const writes = rows.map((row) => {
         const payload = availabilityPayload(row);
         if (row.id && existingIds.has(row.id)) {
-          return base44.entities.AppointmentAvailability.update(row.id, payload);
+          return firebaseClient.entities.AppointmentAvailability.update(row.id, payload);
         }
-        return base44.entities.AppointmentAvailability.create(payload);
+        return firebaseClient.entities.AppointmentAvailability.create(payload);
       });
       await Promise.all([...removals, ...writes]);
     },

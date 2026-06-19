@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { firebaseClient } from "@/api/firebaseClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -26,24 +26,24 @@ export default function Placements() {
   const [editPlacement, setEditPlacement] = useState(null);
 
   const { data: placements = [], isLoading } = useQuery({
-    queryKey: ["placements"], queryFn: () => base44.entities.Placement.list("-created_date", 1000),
+    queryKey: ["placements"], queryFn: () => firebaseClient.entities.Placement.list("-created_date", 1000),
   });
   const { data: clients = [] } = useQuery({
-    queryKey: ["clients"], queryFn: () => base44.entities.Client.list("-created_date", 1000),
+    queryKey: ["clients"], queryFn: () => firebaseClient.entities.Client.list("-created_date", 1000),
   });
   const { data: schools = [] } = useQuery({
-    queryKey: ["schools"], queryFn: () => base44.entities.School.list("-created_date", 1000),
+    queryKey: ["schools"], queryFn: () => firebaseClient.entities.School.list("-created_date", 1000),
   });
 
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.Placement.create(data),
+    mutationFn: (data) => firebaseClient.entities.Placement.create(data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["placements"] }); toast.success("Placement recommended"); },
     onError: () => toast.error("Failed to create"),
   });
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data, prev }) => {
-      const updated = await base44.entities.Placement.update(id, data);
+      const updated = await firebaseClient.entities.Placement.update(id, data);
       if (data.status === "Enrolled" && prev?.status !== "Enrolled") {
         await onPlacementEnrolled({ ...prev, ...data, id });
       }

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { firebaseClient } from "@/api/firebaseClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -19,13 +19,13 @@ export default function Evaluations() {
   const [active, setActive] = useState(null);
 
   const { data: evaluations = [], isLoading } = useQuery({
-    queryKey: ["evaluations"], queryFn: () => base44.entities.Evaluation.list("-created_date", 1000),
+    queryKey: ["evaluations"], queryFn: () => firebaseClient.entities.Evaluation.list("-created_date", 1000),
   });
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data, nextStatus, prev }) => {
       const payload = { ...data, status: nextStatus };
-      const updated = await base44.entities.Evaluation.update(id, payload);
+      const updated = await firebaseClient.entities.Evaluation.update(id, payload);
       if (nextStatus === "Completed" && prev?.status !== "Completed") {
         await onEvaluationCompleted({ ...prev, ...payload, id });
       }

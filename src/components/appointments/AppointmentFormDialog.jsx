@@ -37,7 +37,7 @@ export default function AppointmentFormDialog({
       ? {
           ...appointment,
           date_time: toLocalInput(appointment.date_time),
-          meeting_type: appointment.meeting_type === "Intake" ? "Evaluation" : appointment.meeting_type || "Evaluation",
+          meeting_type: appointment.meeting_type || "Evaluation",
           location: appointment.location || "Office",
         }
       : {

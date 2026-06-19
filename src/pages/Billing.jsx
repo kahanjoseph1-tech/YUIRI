@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { firebaseClient } from "@/api/firebaseClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -27,21 +27,21 @@ export default function Billing() {
   const [payRecord, setPayRecord] = useState(null);
 
   const { data: billing = [], isLoading } = useQuery({
-    queryKey: ["billing"], queryFn: () => base44.entities.BillingRecord.list("-created_date", 1000),
+    queryKey: ["billing"], queryFn: () => firebaseClient.entities.BillingRecord.list("-created_date", 1000),
   });
   const { data: clients = [] } = useQuery({
-    queryKey: ["clients"], queryFn: () => base44.entities.Client.list("-created_date", 1000),
+    queryKey: ["clients"], queryFn: () => firebaseClient.entities.Client.list("-created_date", 1000),
   });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["billing"] });
 
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.BillingRecord.create(data),
+    mutationFn: (data) => firebaseClient.entities.BillingRecord.create(data),
     onSuccess: () => { invalidate(); toast.success("Billing record created"); },
     onError: () => toast.error("Failed to create"),
   });
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.BillingRecord.update(id, data),
+    mutationFn: ({ id, data }) => firebaseClient.entities.BillingRecord.update(id, data),
     onSuccess: () => { invalidate(); toast.success("Updated"); },
     onError: () => toast.error("Update failed"),
   });

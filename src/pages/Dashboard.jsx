@@ -1,5 +1,5 @@
 import React from "react";
-import { base44 } from "@/api/base44Client";
+import { firebaseClient } from "@/api/firebaseClient";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -35,21 +35,21 @@ export default function Dashboard() {
   const { role, canAccessPage } = useRole();
 
   const { data: clients = [], isLoading: l1 } = useQuery({
-    queryKey: ["clients"], queryFn: () => base44.entities.Client.list("-created_date", 500),
+    queryKey: ["clients"], queryFn: () => firebaseClient.entities.Client.list("-created_date", 500),
   });
   const { data: appointments = [], isLoading: l2 } = useQuery({
-    queryKey: ["appointments"], queryFn: () => base44.entities.Appointment.list("-date_time", 500),
+    queryKey: ["appointments"], queryFn: () => firebaseClient.entities.Appointment.list("-date_time", 500),
   });
   const { data: evaluations = [], isLoading: l3 } = useQuery({
-    queryKey: ["evaluations"], queryFn: () => base44.entities.Evaluation.list("-created_date", 500),
+    queryKey: ["evaluations"], queryFn: () => firebaseClient.entities.Evaluation.list("-created_date", 500),
   });
   const { data: billing = [], isLoading: l4 } = useQuery({
-    queryKey: ["billing"], queryFn: () => base44.entities.BillingRecord.list("-created_date", 500),
+    queryKey: ["billing"], queryFn: () => firebaseClient.entities.BillingRecord.list("-created_date", 500),
   });
 
   const loading = l1 || l2 || l3 || l4;
 
-  const newClients = clients.filter((c) => c.status === "New Client" || c.status === "New Lead").length;
+  const newClients = clients.filter((c) => c.status === "New Client").length;
   const now = new Date();
   const in7 = new Date(now.getTime() + 7 * 86400000);
   const upcoming = appointments.filter((a) => {

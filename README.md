@@ -34,19 +34,20 @@ npm run build
 Firebase Hosting serves the static Vite build from `dist` and rewrites all
 routes to `index.html`.
 
-## Data Compatibility
+## Firestore Schema
 
-The v2 UI still imports `base44.entities.*` for minimal page churn, but
-`src/api/base44Client.js` is now a Firebase adapter. It reads and writes
-Firestore collections:
+The app uses `src/api/firebaseClient.js` as the only backend adapter. It reads
+and writes clean Firestore collections:
 
 - `users`
 - `clients`
 - `appointments`
+- `appointment_availability`
 - `evaluations`
 - `billing`
 - `schools`
 - `placements`
 
-Existing camelCase records from the original Firebase app are normalized into
-the snake_case fields expected by the v2 UI.
+The adapter stores canonical snake_case fields only. The first signed-in user
+created in a fresh database becomes `admin`; later signups are created as
+pending `user` records until approved by an admin.
