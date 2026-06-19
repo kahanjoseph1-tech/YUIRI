@@ -85,10 +85,10 @@ function toIso(value) {
 }
 
 function lowerRole(value) {
-  if (!value) return undefined;
+  if (!value) return "user";
   const role = String(value).toLowerCase();
   if (role === "administrator") return "admin";
-  return role;
+  return role === "admin" ? "admin" : "user";
 }
 
 function compact(value) {
@@ -144,14 +144,16 @@ function parentNamesFromClient(data) {
 
 function fromUser(id, data) {
   const role = lowerRole(data.crm_role || data.role);
+  const approvalStatus = data.approval_status || (role === "admin" ? "approved" : "approved");
   return {
     ...data,
     ...withDates(id, data),
     email: data.email || "",
     full_name: data.full_name || data.name || data.displayName || data.email || "User",
     name: data.name || data.full_name || data.displayName || data.email || "User",
-    crm_role: role || "scheduler",
-    role: role || "scheduler",
+    crm_role: role,
+    role,
+    approval_status: approvalStatus,
   };
 }
 
@@ -162,6 +164,7 @@ function toUser(data) {
     name: data.name || data.full_name,
     crm_role: lowerRole(data.crm_role || data.role),
     firebase_uid: data.firebase_uid,
+    approval_status: data.approval_status,
   });
 }
 
@@ -557,12 +560,21 @@ async function ensureUserRecord(firebaseUser) {
     const hasAdmin = users.some((user) => lowerRole(user.crm_role || user.role) === "admin");
     if (existing) {
       if (!hasAdmin && lowerRole(existing.crm_role || existing.role) !== "admin") {
-        return entities.User.update(existing.id, { crm_role: "admin" });
+        return entities.User.update(existing.id, {
+          crm_role: "admin",
+          approval_status: "approved",
+        });
+      }
+      if (!existing.approval_status) {
+        return entities.User.update(existing.id, {
+          crm_role: lowerRole(existing.crm_role || existing.role),
+          approval_status: "approved",
+        });
       }
       return existing;
     }
 
-    const crm_role = hasAdmin ? "scheduler" : "admin";
+    const crm_role = hasAdmin ? "user" : "admin";
     return entities.User.create({
       email,
       full_name: displayName,
@@ -570,6 +582,7 @@ async function ensureUserRecord(firebaseUser) {
       crm_role,
       role: crm_role,
       firebase_uid: firebaseUser.uid,
+      approval_status: hasAdmin ? "pending" : "approved",
     });
   } catch (error) {
     console.warn("Unable to sync Firebase user record:", error);
@@ -580,6 +593,7 @@ async function ensureUserRecord(firebaseUser) {
       name: displayName,
       crm_role: "admin",
       role: "admin",
+      approval_status: "approved",
       firebase_uid: firebaseUser.uid,
     };
   }

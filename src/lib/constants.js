@@ -163,11 +163,9 @@ export const PAYMENT_METHODS = [
 ];
 
 // ---- Users / Roles ----
-export const ROLES = ["admin", "scheduler", "evaluator", "billing"];
+export const ROLES = ["admin", "user"];
 
 export const ROLE_LABELS = {
-  admin: "Administrator",
-  scheduler: "Scheduler",
-  evaluator: "Evaluator",
-  billing: "Billing",
+  admin: "Admin",
+  user: "User",
 };

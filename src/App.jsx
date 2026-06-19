@@ -21,7 +21,7 @@ const LayoutWrapper = ({ children, currentPageName }) => Layout ?
   : <>{children}</>;
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, isAuthenticated, authError } = useAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, isAuthenticated, authError, user } = useAuth();
 
   // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
@@ -34,6 +34,10 @@ const AuthenticatedApp = () => {
 
   if (!isAuthenticated) {
     return <LoginScreen authError={authError} />;
+  }
+
+  if (user?.approval_status === "pending") {
+    return <PendingApprovalScreen />;
   }
 
   // Render the main app
@@ -63,6 +67,26 @@ const AuthenticatedApp = () => {
     </Routes>
   );
 };
+
+function PendingApprovalScreen() {
+  const { logout, user } = useAuth();
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
+      <div className="w-full max-w-sm bg-white border border-slate-200 rounded-xl shadow-sm p-6 text-center space-y-4">
+        <div>
+          <h1 className="text-2xl font-bold text-[#1e3a5f]">Waiting for approval</h1>
+          <p className="text-sm text-slate-500 mt-2">
+            {user?.email || "This account"} needs admin approval before using Yuiri.
+          </p>
+        </div>
+        <Button variant="outline" className="w-full" onClick={logout}>
+          Sign out
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 function LoginScreen({ authError }) {
   const { loginWithGoogle, loginWithEmail, registerWithEmail } = useAuth();

@@ -11,7 +11,7 @@ import StatusBadge from "@/components/StatusBadge";
 import ClientFormDrawer from "@/components/clients/ClientFormDrawer";
 import AppointmentFormDialog from "@/components/appointments/AppointmentFormDialog";
 import BillingFormDialog from "@/components/billing/BillingFormDialog";
-import { getEffectiveRole, can } from "@/lib/roles";
+import { can } from "@/lib/roles";
 import { useRole } from "@/lib/useRole";
 import { fmtDate, fmtDateTime } from "@/lib/format";
 
@@ -67,7 +67,7 @@ export default function ClientDetail() {
   });
 
   const client = clients.find((c) => c.id === id);
-  const evaluators = users.filter((u) => getEffectiveRole(u) === "evaluator" || u.crm_role === "evaluator");
+  const evaluators = users.filter((u) => (u.approval_status || "approved") === "approved");
 
   const updateMutation = useMutation({
     mutationFn: ({ data }) => base44.entities.Client.update(id, data),

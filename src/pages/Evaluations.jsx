@@ -10,13 +10,10 @@ import StatusBadge from "@/components/StatusBadge";
 import EvaluationFormDialog from "@/components/evaluations/EvaluationFormDialog";
 import { EVALUATION_STATUSES } from "@/lib/constants";
 import { onEvaluationCompleted } from "@/lib/automations";
-import { useRole } from "@/lib/useRole";
 import { fmtDate } from "@/lib/format";
 
 export default function Evaluations() {
   const queryClient = useQueryClient();
-  const { user, role } = useRole();
-  const isEvaluator = role === "evaluator";
 
   const [statusFilter, setStatusFilter] = useState("open");
   const [active, setActive] = useState(null);
@@ -48,7 +45,6 @@ export default function Evaluations() {
   });
 
   let visible = evaluations;
-  if (isEvaluator) visible = visible.filter((e) => e.evaluator_id === user?.id);
   if (statusFilter === "open") visible = visible.filter((e) => e.status === "Pending" || e.status === "In Progress");
   else if (statusFilter !== "all") visible = visible.filter((e) => e.status === statusFilter);
 

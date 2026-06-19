@@ -3,23 +3,19 @@
 
 export function getEffectiveRole(user) {
   if (!user) return null;
-  if (user.crm_role) return user.crm_role;
-  if (String(user.role).toLowerCase() === "admin") return "admin";
-  return "scheduler";
+  const role = String(user.crm_role || user.role || "").toLowerCase();
+  return role === "admin" ? "admin" : "user";
 }
 
 // Which page keys each role may open. ClientDetail follows Clients access.
+const CRM_PAGES = [
+  "Dashboard", "Clients", "ClientDetail", "Appointments", "Evaluations",
+  "Schools", "Placements", "Billing", "Reports",
+];
+
 const PAGE_ACCESS = {
-  admin: [
-    "Dashboard", "Clients", "ClientDetail", "Appointments", "Evaluations",
-    "Schools", "Placements", "Billing", "Reports", "Users",
-  ],
-  scheduler: ["Dashboard", "Clients", "ClientDetail", "Appointments", "Schools"],
-  evaluator: [
-    "Dashboard", "Clients", "ClientDetail", "Appointments",
-    "Evaluations", "Schools", "Placements",
-  ],
-  billing: ["Dashboard", "Clients", "ClientDetail", "Billing"],
+  admin: [...CRM_PAGES, "Users"],
+  user: CRM_PAGES,
 };
 
 export function canAccessPage(role, pageKey) {
@@ -34,9 +30,10 @@ const CAPABILITIES = {
     "placements.write": true, "billing.write": true, "schools.write": true,
     "users.write": true,
   },
-  scheduler: { "clients.write": true, "appointments.write": true },
-  evaluator: { "evaluations.write": true, "placements.write": true },
-  billing: { "billing.write": true },
+  user: {
+    "clients.write": true, "appointments.write": true, "evaluations.write": true,
+    "placements.write": true, "billing.write": true, "schools.write": true,
+  },
 };
 
 export function can(role, capability) {

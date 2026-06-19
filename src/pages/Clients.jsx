@@ -13,7 +13,7 @@ import { Plus, Search, ArrowUpDown, Users } from "lucide-react";
 import StatusBadge from "@/components/StatusBadge";
 import ClientFormDrawer from "@/components/clients/ClientFormDrawer";
 import { CLIENT_STATUSES } from "@/lib/constants";
-import { getEffectiveRole, can } from "@/lib/roles";
+import { can } from "@/lib/roles";
 import { useRole } from "@/lib/useRole";
 
 const PAGE_SIZE = 12;
@@ -59,7 +59,7 @@ export default function Clients() {
   const { data: users = [] } = useQuery({
     queryKey: ["users"], queryFn: () => base44.entities.User.list("-created_date", 200),
   });
-  const evaluators = users.filter((u) => getEffectiveRole(u) === "evaluator" || u.crm_role === "evaluator");
+  const evaluators = users.filter((u) => (u.approval_status || "approved") === "approved");
 
   const createMutation = useMutation({
     mutationFn: (data) => base44.entities.Client.create(data),

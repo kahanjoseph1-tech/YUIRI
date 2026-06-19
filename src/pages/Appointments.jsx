@@ -13,7 +13,7 @@ import AvailabilityDialog from "@/components/appointments/AvailabilityDialog";
 import DayScheduleDialog from "@/components/appointments/DayScheduleDialog";
 import { APPOINTMENT_STATUSES } from "@/lib/constants";
 import { onAppointmentCompleted } from "@/lib/automations";
-import { getEffectiveRole, can } from "@/lib/roles";
+import { can } from "@/lib/roles";
 import { useRole } from "@/lib/useRole";
 import { fmtDateTime } from "@/lib/format";
 
@@ -29,9 +29,8 @@ function availabilityPayload(row) {
 
 export default function Appointments() {
   const queryClient = useQueryClient();
-  const { user, role } = useRole();
+  const { role } = useRole();
   const canWrite = can(role, "appointments.write");
-  const isEvaluator = role === "evaluator";
 
   const [view, setView] = useState("calendar");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -54,7 +53,7 @@ export default function Appointments() {
     queryKey: ["appointment-availability"],
     queryFn: () => base44.entities.AppointmentAvailability.list("day_of_week", 500),
   });
-  const evaluators = users.filter((u) => getEffectiveRole(u) === "evaluator" || u.crm_role === "evaluator");
+  const evaluators = users.filter((u) => (u.approval_status || "approved") === "approved");
 
   const createMutation = useMutation({
     mutationFn: (data) => base44.entities.Appointment.create(data),
@@ -107,11 +106,7 @@ export default function Appointments() {
     onError: () => toast.error("Could not save slots"),
   });
 
-  // Evaluators only see their own appointments.
-  const roleVisibleAppointments = useMemo(() => {
-    if (isEvaluator) return appointments.filter((a) => a.evaluator_id === user?.id);
-    return appointments;
-  }, [appointments, isEvaluator, user?.id]);
+  const roleVisibleAppointments = useMemo(() => appointments, [appointments]);
 
   let visible = roleVisibleAppointments;
   if (statusFilter !== "all") visible = visible.filter((a) => a.status === statusFilter);

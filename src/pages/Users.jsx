@@ -2,6 +2,7 @@ import React from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,17 +17,17 @@ export default function Users() {
     queryKey: ["users"], queryFn: () => base44.entities.User.list("-created_date", 500),
   });
 
-  const updateRole = useMutation({
-    mutationFn: ({ id, crm_role }) => base44.entities.User.update(id, { crm_role }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["users"] }); toast.success("Role updated"); },
-    onError: () => toast.error("Failed to update role"),
+  const updateUser = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.User.update(id, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["users"] }); toast.success("User updated"); },
+    onError: () => toast.error("Failed to update user"),
   });
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Users</h1>
-        <p className="text-sm text-gray-500 mt-1">Manage team members and roles</p>
+        <p className="text-sm text-gray-500 mt-1">Approve users and choose Admin or User access</p>
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-100">
@@ -43,8 +44,9 @@ export default function Users() {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
-                <TableHead>Platform Role</TableHead>
-                <TableHead className="w-48">CRM Role</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="w-48">Access</TableHead>
+                <TableHead className="w-32 text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -52,17 +54,32 @@ export default function Users() {
                 <TableRow key={u.id}>
                   <TableCell className="font-medium text-gray-900">{u.full_name || u.name || "—"}</TableCell>
                   <TableCell className="text-gray-500">{u.email}</TableCell>
-                  <TableCell className="text-gray-400">{u.role || "user"}</TableCell>
+                  <TableCell className="text-gray-500 capitalize">{u.approval_status || "approved"}</TableCell>
                   <TableCell>
                     <Select
                       value={getEffectiveRole(u)}
-                      onValueChange={(crm_role) => updateRole.mutate({ id: u.id, crm_role })}
+                      onValueChange={(crm_role) => updateUser.mutate({ id: u.id, data: { crm_role } })}
                     >
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {ROLES.map((r) => <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>)}
                       </SelectContent>
                     </Select>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {(u.approval_status || "approved") === "pending" ? (
+                      <Button
+                        size="sm"
+                        onClick={() => updateUser.mutate({
+                          id: u.id,
+                          data: { approval_status: "approved", crm_role: getEffectiveRole(u) },
+                        })}
+                      >
+                        Approve
+                      </Button>
+                    ) : (
+                      <span className="text-xs text-gray-400">Approved</span>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
