@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -89,6 +89,28 @@ function downloadHtmlExcel(filename, fields, rows) {
   URL.revokeObjectURL(url);
 }
 
+function caseMatchesEvaluation(openCase, evaluation) {
+  if (!openCase || !evaluation) return false;
+  if (openCase.evaluation_id && openCase.evaluation_id === evaluation.id) return true;
+  return openCase.client_id === evaluation.client_id && (openCase.status || "Open") !== "Closed";
+}
+
+function buildOpenCaseFromEvaluation(evaluation, now = new Date().toISOString()) {
+  return {
+    client_id: evaluation.client_id || "",
+    client_name: evaluation.client_name || "",
+    evaluation_id: evaluation.id || "",
+    appointment_id: evaluation.appointment_id || "",
+    appointment_date: evaluation.appointment_date || "",
+    evaluator_id: evaluation.evaluator_id || "",
+    evaluator_name: evaluation.evaluator_name || "",
+    status: "Open",
+    priority: evaluation.urgency || "Medium",
+    opened_date: now,
+    last_activity_date: now,
+  };
+}
+
 const exportFields = [
   { key: "case_status", label: "Case Status", group: "Case", get: ({ openCase }) => openCase.status || "Open" },
   { key: "case_opened", label: "Case Opened", group: "Case", get: ({ openCase }) => fmtDate(openCase.opened_date || openCase.created_date, "") },
@@ -127,6 +149,7 @@ export default function OpenCases() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState("Open");
+  const [showExportOptions, setShowExportOptions] = useState(false);
   const [selectedFields, setSelectedFields] = useState(() =>
     Object.fromEntries(exportFields.map((field) => [field.key, true]))
   );
@@ -150,16 +173,67 @@ export default function OpenCases() {
     onError: () => toast.error("Failed to update case"),
   });
 
-  const rows = useMemo(() => {
-    return openCases
-      .map((openCase) => {
-        const client = clients.find((record) => record.id === openCase.client_id);
-        const evaluation = evaluations.find((record) => record.id === openCase.evaluation_id) ||
-          evaluations.find((record) => record.client_id === openCase.client_id && record.status === "Completed");
-        return { openCase, client, evaluation };
+  const missingCompletedEvaluations = useMemo(() => {
+    return evaluations.filter((evaluation) =>
+      evaluation?.status === "Completed" &&
+      evaluation.client_id &&
+      !openCases.some((openCase) => caseMatchesEvaluation(openCase, evaluation))
+    );
+  }, [evaluations, openCases]);
+
+  useEffect(() => {
+    if (missingCompletedEvaluations.length === 0) return undefined;
+
+    let cancelled = false;
+    const now = new Date().toISOString();
+
+    Promise.all(
+      missingCompletedEvaluations.map((evaluation) =>
+        firebaseClient.entities.OpenCase.create(buildOpenCaseFromEvaluation(evaluation, now))
+      )
+    )
+      .then(() => {
+        if (!cancelled) {
+          queryClient.invalidateQueries({ queryKey: ["open_cases"] });
+        }
       })
+      .catch((error) => {
+        console.error("Failed to sync completed evaluations into Open Cases:", error);
+        if (!cancelled) {
+          toast.error("Failed to sync completed evaluations into Open Cases");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [missingCompletedEvaluations, queryClient]);
+
+  const rows = useMemo(() => {
+    const caseRows = openCases.map((openCase) => {
+      const client = clients.find((record) => record.id === openCase.client_id);
+      const evaluation = evaluations.find((record) => record.id === openCase.evaluation_id) ||
+        evaluations.find((record) => record.client_id === openCase.client_id && record.status === "Completed");
+      return { openCase, client, evaluation, synthetic: false };
+    });
+
+    const evaluationRows = missingCompletedEvaluations.map((evaluation) => {
+      const client = clients.find((record) => record.id === evaluation.client_id);
+      const fallbackDate = evaluation.completed_date || evaluation.updated_date || evaluation.created_date || new Date().toISOString();
+      return {
+        openCase: {
+          id: `completed-${evaluation.id}`,
+          ...buildOpenCaseFromEvaluation(evaluation, fallbackDate),
+        },
+        client,
+        evaluation,
+        synthetic: true,
+      };
+    });
+
+    return [...caseRows, ...evaluationRows]
       .filter(({ openCase }) => statusFilter === "all" || (openCase.status || "Open") === statusFilter);
-  }, [openCases, clients, evaluations, statusFilter]);
+  }, [openCases, clients, evaluations, missingCompletedEvaluations, statusFilter]);
 
   const groupedFields = useMemo(() => {
     return exportFields.reduce((groups, field) => {
@@ -200,46 +274,51 @@ export default function OpenCases() {
               <SelectItem value="all">All Cases</SelectItem>
             </SelectContent>
           </Select>
-          <Button className="gap-2 bg-[#1e3a5f] hover:bg-[#1e3a5f]/90" onClick={downloadExcel}>
+          <Button className="gap-2 bg-[#1e3a5f] hover:bg-[#1e3a5f]/90" onClick={() => setShowExportOptions((current) => !current)}>
             <Download className="w-4 h-4" /> Download Excel
           </Button>
         </div>
       </div>
 
-      <section className="bg-white rounded-2xl border border-gray-100 p-4 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-              <FileSpreadsheet className="w-4 h-4 text-gray-400" /> Excel fields
-            </h2>
-            <p className="text-xs text-gray-400 mt-1">{selectedCount} selected</p>
-          </div>
-          <div className="flex gap-2">
-            <Button type="button" size="sm" variant="outline" onClick={() => setAllFields(true)}>Select all</Button>
-            <Button type="button" size="sm" variant="outline" onClick={() => setAllFields(false)}>Clear</Button>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-          {Object.entries(groupedFields).map(([group, fields]) => (
-            <div key={group} className="rounded-lg border border-gray-100 p-3">
-              <h3 className="text-sm font-semibold text-gray-800 mb-2">{group}</h3>
-              <div className="space-y-2">
-                {fields.map((field) => (
-                  <label key={field.key} className="flex items-start gap-2 text-sm text-gray-600">
-                    <Checkbox
-                      checked={Boolean(selectedFields[field.key])}
-                      onCheckedChange={(checked) =>
-                        setSelectedFields((current) => ({ ...current, [field.key]: Boolean(checked) }))
-                      }
-                    />
-                    <span className="leading-4">{field.label}</span>
-                  </label>
-                ))}
-              </div>
+      {showExportOptions && (
+        <section className="bg-white rounded-2xl border border-gray-100 p-4 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+                <FileSpreadsheet className="w-4 h-4 text-gray-400" /> Excel fields
+              </h2>
+              <p className="text-xs text-gray-400 mt-1">{selectedCount} selected</p>
             </div>
-          ))}
-        </div>
-      </section>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" size="sm" variant="outline" onClick={() => setAllFields(true)}>Select all</Button>
+              <Button type="button" size="sm" variant="outline" onClick={() => setAllFields(false)}>Clear</Button>
+              <Button type="button" size="sm" className="gap-2 bg-[#1e3a5f] hover:bg-[#1e3a5f]/90" onClick={downloadExcel}>
+                <Download className="w-4 h-4" /> Download Excel
+              </Button>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            {Object.entries(groupedFields).map(([group, fields]) => (
+              <div key={group} className="rounded-lg border border-gray-100 p-3">
+                <h3 className="text-sm font-semibold text-gray-800 mb-2">{group}</h3>
+                <div className="space-y-2">
+                  {fields.map((field) => (
+                    <label key={field.key} className="flex items-start gap-2 text-sm text-gray-600">
+                      <Checkbox
+                        checked={Boolean(selectedFields[field.key])}
+                        onCheckedChange={(checked) =>
+                          setSelectedFields((current) => ({ ...current, [field.key]: Boolean(checked) }))
+                        }
+                      />
+                      <span className="leading-4">{field.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="bg-white rounded-2xl border border-gray-100">
         {isLoading ? (
@@ -262,7 +341,7 @@ export default function OpenCases() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map(({ openCase, client, evaluation }) => (
+              {rows.map(({ openCase, client, evaluation, synthetic }) => (
                 <TableRow key={openCase.id}>
                   <TableCell className="font-medium text-gray-900">
                     <button
@@ -292,6 +371,7 @@ export default function OpenCases() {
                         <Button
                           size="sm"
                           variant="outline"
+                          disabled={synthetic || updateCase.isPending}
                           onClick={() => updateCase.mutate({ id: openCase.id, data: { status: "Open", last_activity_date: new Date().toISOString() } })}
                         >
                           Reopen
@@ -300,6 +380,7 @@ export default function OpenCases() {
                         <Button
                           size="sm"
                           variant="outline"
+                          disabled={synthetic || updateCase.isPending}
                           onClick={() => updateCase.mutate({ id: openCase.id, data: { status: "Closed", closed_date: new Date().toISOString(), last_activity_date: new Date().toISOString() } })}
                         >
                           Close
