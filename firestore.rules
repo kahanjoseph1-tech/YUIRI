@@ -93,6 +93,10 @@ service cloud.firestore {
       allow read, write: if currentUserIsApproved();
     }
 
+    match /follow_ups/{document} {
+      allow read, write: if currentUserIsApproved();
+    }
+
     match /billing/{document} {
       allow read, write: if currentUserIsApproved();
     }

@@ -22,6 +22,10 @@ const STATUS_TONE = {
   // Appointment
   "Scheduled": "yellow",
   "Completed": "green",
+  "Done": "green",
+  "Open": "blue",
+  "Logged": "gray",
+  "Overdue": "red",
   "No Show": "red",
   "Rescheduled": "blue",
   "Cancelled": "red",
