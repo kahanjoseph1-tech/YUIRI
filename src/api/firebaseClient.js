@@ -22,6 +22,7 @@ const collectionNames = {
   BillingRecord: "billing",
   School: "schools",
   Placement: "placements",
+  FinancialTransaction: "financial_transactions",
 };
 
 const bootstrapAdminEmails = new Set(["kahanjoseph1@gmail.com"]);
@@ -397,6 +398,41 @@ function toBillingRecord(data) {
   });
 }
 
+function fromFinancialTransaction(id, data) {
+  return {
+    ...withDates(id, data),
+    type: data.type === "Expense" ? "Expense" : "Income",
+    category: data.category || "",
+    amount: Number(data.amount || 0),
+    date: toIso(data.date),
+    description: data.description || "",
+    client_id: data.client_id || "",
+    client_name: data.client_name || "",
+    payee: data.payee || "",
+    payment_method: data.payment_method || "",
+    reference: data.reference || "",
+    billing_id: data.billing_id || "",
+    notes: data.notes || "",
+  };
+}
+
+function toFinancialTransaction(data) {
+  return compact({
+    type: data.type === "Expense" ? "Expense" : "Income",
+    category: data.category,
+    amount: Number(data.amount || 0),
+    date: data.date,
+    description: data.description,
+    client_id: data.client_id,
+    client_name: data.client_name,
+    payee: data.payee,
+    payment_method: data.payment_method,
+    reference: data.reference,
+    billing_id: data.billing_id,
+    notes: data.notes,
+  });
+}
+
 function identityFromDb(id, data) {
   return {
     ...data,
@@ -418,6 +454,7 @@ const transforms = {
   BillingRecord: { fromDb: fromBillingRecord, toDb: toBillingRecord },
   School: { fromDb: identityFromDb, toDb: compact },
   Placement: { fromDb: identityFromDb, toDb: compact },
+  FinancialTransaction: { fromDb: fromFinancialTransaction, toDb: toFinancialTransaction },
 };
 
 function compareValues(a, b) {

@@ -10,7 +10,7 @@ export function getEffectiveRole(user) {
 // Which page keys each role may open. ClientDetail follows Clients access.
 const CRM_PAGES = [
   "Dashboard", "Clients", "ClientDetail", "Appointments", "Evaluations",
-  "OpenCases", "Schools", "Placements", "Billing", "Reports",
+  "OpenCases", "Schools", "Placements", "Billing", "Financials", "Reports",
 ];
 
 const PAGE_ACCESS = {
@@ -28,11 +28,12 @@ const CAPABILITIES = {
   admin: {
     "clients.write": true, "appointments.write": true, "evaluations.write": true,
     "placements.write": true, "billing.write": true, "schools.write": true,
-    "users.write": true,
+    "financials.write": true, "users.write": true,
   },
   user: {
     "clients.write": true, "appointments.write": true, "evaluations.write": true,
     "placements.write": true, "billing.write": true, "schools.write": true,
+    "financials.write": true,
   },
 };
 
@@ -51,6 +52,7 @@ export const NAV_ITEMS = [
   { key: "Schools", label: "Yeshiva's", icon: "GraduationCap" },
   { key: "Placements", label: "Placements", icon: "ArrowRightLeft" },
   { key: "Billing", label: "Billing", icon: "DollarSign" },
+  { key: "Financials", label: "Financials", icon: "Wallet" },
   { key: "Reports", label: "Reports", icon: "BarChart3" },
   { key: "Users", label: "Users", icon: "Users" },
   { key: "Settings", label: "Settings", icon: "Settings" },

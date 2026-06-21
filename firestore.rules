@@ -108,5 +108,9 @@ service cloud.firestore {
     match /placements/{document} {
       allow read, write: if currentUserIsApproved();
     }
+
+    match /financial_transactions/{document} {
+      allow read, write: if currentUserIsApproved();
+    }
   }
 }

@@ -162,6 +162,36 @@ export const PAYMENT_METHODS = [
   "Other",
 ];
 
+// ---- Financials ----
+export const TRANSACTION_TYPES = ["Income", "Expense"];
+
+export const INCOME_CATEGORIES = [
+  "Client Payment",
+  "Consultation Fee",
+  "Donation",
+  "Grant",
+  "Other Income",
+];
+
+export const EXPENSE_CATEGORIES = [
+  "Payroll",
+  "Rent",
+  "Utilities",
+  "Office Supplies",
+  "Software",
+  "Marketing",
+  "Travel",
+  "Professional Fees",
+  "Insurance",
+  "Taxes",
+  "Other Expense",
+];
+
+export const TRANSACTION_CATEGORIES = {
+  Income: INCOME_CATEGORIES,
+  Expense: EXPENSE_CATEGORIES,
+};
+
 // ---- Users / Roles ----
 export const ROLES = ["admin", "user"];
 
