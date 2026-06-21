@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client'
 import App from '@/App.jsx'
 import '@/index.css'
 
-const buildVersion = 'yeshiva-import-ui-2026-06-21-1'
+const buildVersion = 'open-case-dedup-2026-06-21-1'
 
 window.__YUIRI_BUILD_VERSION__ = buildVersion
 

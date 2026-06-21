@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import StatusBadge from "@/components/StatusBadge";
 import { fmtDate, fmtDateTime } from "@/lib/format";
+import { ensureOpenCaseForEvaluation } from "@/lib/automations";
 
 const questionnaireFields = [
   { key: "fartags", label: "פארטאגס" },
@@ -202,11 +203,10 @@ export default function OpenCases() {
     if (missingCompletedEvaluations.length === 0) return undefined;
 
     let cancelled = false;
-    const now = new Date().toISOString();
 
     Promise.all(
       missingCompletedEvaluations.map((evaluation) =>
-        firebaseClient.entities.OpenCase.create(buildOpenCaseFromEvaluation(evaluation, now))
+        ensureOpenCaseForEvaluation(evaluation)
       )
     )
       .then(() => {

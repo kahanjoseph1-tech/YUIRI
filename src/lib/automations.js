@@ -25,9 +25,16 @@ function evaluationBillingDetails(evaluation) {
   };
 }
 
-async function ensureOpenCaseForEvaluation(evaluation) {
+export function openCaseIdForEvaluation(evaluation) {
+  if (evaluation?.id) return `evaluation_${evaluation.id}`;
+  if (evaluation?.client_id) return `client_${evaluation.client_id}_open`;
+  return "";
+}
+
+export async function ensureOpenCaseForEvaluation(evaluation) {
   if (!evaluation?.client_id) return null;
 
+  const now = new Date().toISOString();
   const details = {
     client_id: evaluation.client_id,
     client_name: evaluation.client_name || "",
@@ -38,28 +45,32 @@ async function ensureOpenCaseForEvaluation(evaluation) {
     evaluator_name: evaluation.evaluator_name || "",
     status: "Open",
     priority: evaluation.urgency || "Medium",
-    opened_date: new Date().toISOString(),
-    last_activity_date: new Date().toISOString(),
+    opened_date: now,
+    last_activity_date: now,
   };
 
   try {
     const openCases = await firebaseClient.entities.OpenCase.list("-created_date", 1000);
-    const existing = openCases.find((record) =>
-      record.evaluation_id === evaluation.id ||
-      (record.client_id === evaluation.client_id && record.status !== "Closed")
+    const existingByEvaluation = evaluation.id
+      ? openCases.find((record) => record.evaluation_id === evaluation.id)
+      : null;
+    const existing = existingByEvaluation || openCases.find((record) =>
+      record.client_id === evaluation.client_id && (record.status || "Open") !== "Closed"
     );
 
     if (existing) {
       return firebaseClient.entities.OpenCase.update(existing.id, {
         ...details,
+        status: existing.status || details.status,
         opened_date: existing.opened_date || details.opened_date,
+        closed_date: existing.closed_date,
       });
     }
   } catch {
-    // If lookup fails, still create the case so completed evaluations surface.
+    // If lookup fails, use a deterministic document id so retries do not duplicate cases.
   }
 
-  return firebaseClient.entities.OpenCase.create(details);
+  return firebaseClient.entities.OpenCase.upsert(openCaseIdForEvaluation(evaluation), details);
 }
 
 export async function ensureEvaluationBillingForAppointment(appointment) {

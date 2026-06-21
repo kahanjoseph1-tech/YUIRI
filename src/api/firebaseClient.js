@@ -506,6 +506,24 @@ function createEntity(entityName) {
       return this.get(id);
     },
 
+    async upsert(id, data) {
+      if (!id) return this.create(data);
+
+      const now = new Date().toISOString();
+      const sourceData = { ...(data || {}) };
+      const existing = await this.get(id);
+      if (entityName === "Client" && !normalizeClientId(sourceData.client_id)) {
+        sourceData.client_id = existing?.client_id || (await nextFourDigitClientId(transformer));
+      }
+      const payload = compact({
+        ...transformer.toDb(sourceData),
+        created_date: existing?.created_date || sourceData.created_date || now,
+        updated_date: now,
+      });
+      await setDoc(doc(db, collectionName, id), payload, { merge: true });
+      return this.get(id);
+    },
+
     async delete(id) {
       await deleteDoc(doc(db, collectionName, id));
       return true;
