@@ -180,7 +180,7 @@ export async function onEvaluationCompleted(evaluation) {
 
   if (evaluation.client_id) {
     await firebaseClient.entities.Client.update(evaluation.client_id, {
-      status: "School Match Needed",
+      status: "Yeshiva Match Needed",
       ready_to_bill: true,
     });
   }
@@ -247,6 +247,32 @@ export function computePaymentStatus(amountDue, amountPaid) {
 // 5. Placement -> "Enrolled": mark the client as "Accepted".
 export async function onPlacementEnrolled(placement) {
   if (placement?.client_id) {
-    await firebaseClient.entities.Client.update(placement.client_id, { status: "Accepted" });
+    const now = new Date().toISOString();
+    await firebaseClient.entities.Client.update(placement.client_id, {
+      status: "Accepted",
+      placement_status: "Closed",
+      final_school_id: placement.school_id || "",
+      final_school_name: placement.school_name || "",
+      final_placement_id: placement.id || "",
+      placement_closed_date: now,
+    });
+
+    try {
+      const openCases = await firebaseClient.entities.OpenCase.list("-created_date", 1000);
+      const relatedOpenCases = openCases.filter((record) =>
+        record.client_id === placement.client_id && (record.status || "Open") !== "Closed"
+      );
+      await Promise.all(relatedOpenCases.map((record) =>
+        firebaseClient.entities.OpenCase.update(record.id, {
+          status: "Closed",
+          closed_date: now,
+          last_activity_date: now,
+          final_school_id: placement.school_id || "",
+          final_school_name: placement.school_name || "",
+        })
+      ));
+    } catch {
+      // Closing the client placement should not fail just because case sync failed.
+    }
   }
 }

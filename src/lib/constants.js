@@ -10,7 +10,7 @@ export const CLIENT_STATUSES = [
   "New Client",
   "Intake Scheduled",
   "Evaluating",
-  "School Match Needed",
+  "Yeshiva Match Needed",
   "Referred",
   "Accepted",
   "Inactive",
@@ -39,14 +39,14 @@ export const DEFAULT_RESPONSIBLE_OPTIONS = [
   "Parents",
   "Boy",
   "Rabbi",
-  "School",
+  "Yeshiva",
   "Other",
 ];
 
 export const REFERRAL_SOURCES = [
   "Word of Mouth",
   "Rabbi/Rav",
-  "School",
+  "Yeshiva",
   "Website",
   "Social Media",
   "Repeat Client",
@@ -140,7 +140,7 @@ export const PLACEMENT_STATUSES = [
 export const SERVICE_TYPES = [
   "Initial Consultation",
   "Evaluation",
-  "School Placement",
+  "Yeshiva Placement",
   "Follow-Up",
   "Other",
 ];

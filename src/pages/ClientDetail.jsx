@@ -30,6 +30,7 @@ import {
   UserRound,
 } from "lucide-react";
 import StatusBadge from "@/components/StatusBadge";
+import Combobox from "@/components/common/Combobox";
 import ClientFormDrawer from "@/components/clients/ClientFormDrawer";
 import AppointmentFormDialog from "@/components/appointments/AppointmentFormDialog";
 import BillingFormDialog from "@/components/billing/BillingFormDialog";
@@ -70,6 +71,10 @@ const FOLLOW_UP_EMPTY = {
 
 function fullName(client) {
   return `${client?.boy_first_name || ""} ${client?.boy_last_name || ""}`.trim() || "Client";
+}
+
+function yeshivaOptionLabel(yeshiva) {
+  return [yeshiva?.name, yeshiva?.location, yeshiva?.hashkafa].filter(Boolean).join(" - ");
 }
 
 function phoneLabel(phone) {
@@ -240,12 +245,15 @@ export default function ClientDetail() {
   const canEditClient = can(role, "clients.write");
   const canSchedule = can(role, "appointments.write");
   const canBill = can(role, "billing.write");
+  const canPlace = can(role, "placements.write");
 
   const [editOpen, setEditOpen] = useState(false);
   const [apptOpen, setApptOpen] = useState(false);
   const [billOpen, setBillOpen] = useState(false);
   const [followFormOpen, setFollowFormOpen] = useState(false);
   const [followForm, setFollowForm] = useState(FOLLOW_UP_EMPTY);
+  const [recommendSchoolId, setRecommendSchoolId] = useState("");
+  const [finalSchoolId, setFinalSchoolId] = useState("");
 
   const { data: clients = [], isLoading } = useQuery({
     queryKey: ["clients"], queryFn: () => firebaseClient.entities.Client.list("-created_date", 1000),
@@ -261,6 +269,9 @@ export default function ClientDetail() {
   });
   const { data: placements = [] } = useQuery({
     queryKey: ["placements"], queryFn: () => firebaseClient.entities.Placement.list("-created_date", 1000),
+  });
+  const { data: schools = [] } = useQuery({
+    queryKey: ["schools"], queryFn: () => firebaseClient.entities.School.list("-created_date", 1000),
   });
   const { data: openCases = [] } = useQuery({
     queryKey: ["open_cases"], queryFn: () => firebaseClient.entities.OpenCase.list("-created_date", 1000),
@@ -320,6 +331,141 @@ export default function ClientDetail() {
     onError: () => toast.error("Failed to update follow-up"),
   });
 
+  const invalidatePlacementData = () => {
+    ["placements", "clients", "open_cases"].forEach((key) =>
+      queryClient.invalidateQueries({ queryKey: [key] })
+    );
+  };
+
+  const addRecommendation = useMutation({
+    mutationFn: async (schoolId) => {
+      if (!client) throw new Error("Client not loaded");
+      const school = schools.find((record) => record.id === schoolId);
+      if (!school) throw new Error("Choose a yeshiva");
+
+      const existing = placements.find((record) =>
+        record.client_id === id &&
+        record.school_id === school.id &&
+        record.status !== "Enrolled" &&
+        !record.is_final
+      );
+      if (existing) return existing;
+
+      return firebaseClient.entities.Placement.create({
+        client_id: id,
+        client_name: fullName(client),
+        school_id: school.id,
+        school_name: school.name,
+        status: "Recommended",
+        placement_type: "Recommendation",
+        recommended_date: new Date().toISOString(),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["placements"] });
+      setRecommendSchoolId("");
+      toast.success("Yeshiva recommendation added");
+    },
+    onError: (error) => toast.error(error?.message || "Failed to add recommendation"),
+  });
+
+  const closePlacementCase = useMutation({
+    mutationFn: async (schoolId) => {
+      if (!client) throw new Error("Client not loaded");
+      const school = schools.find((record) => record.id === schoolId);
+      if (!school) throw new Error("Choose the final yeshiva");
+
+      const now = new Date().toISOString();
+      const today = now.slice(0, 10);
+      const finalRecord = placements.find((record) => record.client_id === id && record.school_id === school.id) ||
+        placements.find((record) => record.client_id === id && (record.is_final || record.placement_type === "Final Placement"));
+
+      const placementData = {
+        client_id: id,
+        client_name: fullName(client),
+        school_id: school.id,
+        school_name: school.name,
+        status: "Enrolled",
+        placement_type: "Final Placement",
+        is_final: true,
+        decision_date: today,
+        enrolled_date: now,
+        closed_date: now,
+      };
+
+      const placement = finalRecord
+        ? await firebaseClient.entities.Placement.update(finalRecord.id, placementData)
+        : await firebaseClient.entities.Placement.create(placementData);
+
+      await firebaseClient.entities.Client.update(id, {
+        status: "Accepted",
+        placement_status: "Closed",
+        final_school_id: school.id,
+        final_school_name: school.name,
+        final_placement_id: placement.id,
+        placement_closed_date: now,
+      });
+
+      const relatedOpenCases = openCases.filter((record) => record.client_id === id && (record.status || "Open") !== "Closed");
+      await Promise.all(relatedOpenCases.map((record) =>
+        firebaseClient.entities.OpenCase.update(record.id, {
+          status: "Closed",
+          closed_date: now,
+          last_activity_date: now,
+          final_school_id: school.id,
+          final_school_name: school.name,
+        })
+      ));
+
+      return placement;
+    },
+    onSuccess: () => {
+      invalidatePlacementData();
+      setFinalSchoolId("");
+      toast.success("Case closed and saved to placements");
+    },
+    onError: (error) => toast.error(error?.message || "Failed to close case"),
+  });
+
+  const reopenPlacementCase = useMutation({
+    mutationFn: async () => {
+      if (!client) throw new Error("Client not loaded");
+      const now = new Date().toISOString();
+      const latestCase = [...openCases]
+        .filter((record) => record.client_id === id)
+        .sort((a, b) => new Date(b.updated_date || b.closed_date || b.created_date || 0) - new Date(a.updated_date || a.closed_date || a.created_date || 0))[0];
+
+      if (latestCase) {
+        await firebaseClient.entities.OpenCase.update(latestCase.id, {
+          status: "Open",
+          reopened_date: now,
+          last_activity_date: now,
+        });
+      } else {
+        await firebaseClient.entities.OpenCase.create({
+          client_id: id,
+          client_name: fullName(client),
+          status: "Open",
+          priority: "Medium",
+          opened_date: now,
+          reopened_date: now,
+          last_activity_date: now,
+        });
+      }
+
+      await firebaseClient.entities.Client.update(id, {
+        status: "Yeshiva Match Needed",
+        placement_status: "Open",
+        placement_reopened_date: now,
+      });
+    },
+    onSuccess: () => {
+      invalidatePlacementData();
+      toast.success("Case reopened");
+    },
+    onError: (error) => toast.error(error?.message || "Failed to reopen case"),
+  });
+
   const deleteClient = useMutation({
     mutationFn: async () => {
       const relatedDeletes = [
@@ -364,6 +510,16 @@ export default function ClientDetail() {
     .filter((record) => record.client_id === id)
     .sort((a, b) => new Date(b.appointment_date || b.created_date) - new Date(a.appointment_date || a.created_date));
   const myBilling = billing.filter((record) => record.client_id === id);
+  const myPlacements = placements
+    .filter((record) => record.client_id === id)
+    .sort((a, b) => new Date(b.closed_date || b.updated_date || b.created_date || 0) - new Date(a.closed_date || a.updated_date || a.created_date || 0));
+  const finalPlacement = myPlacements.find((record) => record.is_final || record.placement_type === "Final Placement" || record.status === "Enrolled");
+  const recommendationPlacements = myPlacements.filter((record) =>
+    record.id !== finalPlacement?.id &&
+    !record.is_final &&
+    record.placement_type !== "Final Placement" &&
+    record.status !== "Enrolled"
+  );
   const myFollowUps = followUps
     .filter((record) => record.client_id === id)
     .sort((a, b) => {
@@ -379,11 +535,18 @@ export default function ClientDetail() {
   const openTasks = myFollowUps.filter((record) => record.type === "Task" && record.status !== "Done");
   const latestEval = myEvals[0];
   const name = fullName(client);
+  const yeshivaOptions = schools.map((school) => ({
+    value: school.id,
+    label: yeshivaOptionLabel(school),
+  }));
+  const selectedFinalSchoolId = finalSchoolId || finalPlacement?.school_id || client.final_school_id || "";
+  const caseIsClosed = client.placement_status ? client.placement_status === "Closed" : Boolean(finalPlacement?.closed_date);
 
   const timeline = [
     ...myAppts.map((record) => ({ ts: record.date_time || record.created_date, type: "Appointment", label: `${record.meeting_type || "Meeting"}`, status: record.status })),
     ...myEvals.map((record) => ({ ts: record.created_date, type: "Evaluation", label: record.evaluator_name || "Evaluation", status: record.status })),
     ...myBilling.map((record) => ({ ts: record.created_date, type: "Billing", label: `${record.service_type || "Service"}${record.invoice_number ? ` - ${record.invoice_number}` : ""}`, status: record.billing_status })),
+    ...myPlacements.map((record) => ({ ts: record.closed_date || record.updated_date || record.created_date, type: "Placement", label: `${record.school_name || "Yeshiva"}${record.placement_type ? ` - ${record.placement_type}` : ""}`, status: record.status })),
     ...myFollowUps.map((record) => ({ ts: record.created_date, type: record.type || "Follow-up", label: record.title || record.details || "Follow-up", status: record.status })),
   ].sort((a, b) => new Date(b.ts) - new Date(a.ts));
 
@@ -548,6 +711,129 @@ export default function ClientDetail() {
           </div>
         </Section>
       </div>
+
+      <Section title="Placement">
+        <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-5">
+          <div className="rounded-xl border border-gray-100 p-4 space-y-4">
+            <div>
+              <h3 className="font-semibold text-gray-900">First recommendations</h3>
+              <p className="text-xs text-gray-400 mt-1">Search the yeshiva list and add as many recommendations as needed.</p>
+            </div>
+
+            {canPlace && (
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Combobox
+                  options={yeshivaOptions}
+                  value={recommendSchoolId}
+                  onChange={setRecommendSchoolId}
+                  placeholder="Search yeshiva list..."
+                  emptyText="No yeshivas found."
+                />
+                <Button
+                  type="button"
+                  className="gap-2 bg-[#1e3a5f] hover:bg-[#1e3a5f]/90"
+                  disabled={!recommendSchoolId || addRecommendation.isPending}
+                  onClick={() => addRecommendation.mutate(recommendSchoolId)}
+                >
+                  <Plus className="w-4 h-4" /> Add
+                </Button>
+              </div>
+            )}
+
+            {recommendationPlacements.length === 0 ? (
+              <p className="text-sm text-gray-400 rounded-lg border border-dashed border-gray-200 p-4 text-center">
+                No yeshiva recommendations yet.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {recommendationPlacements.map((placement) => (
+                  <div key={placement.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-gray-100 px-3 py-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-medium text-gray-900 truncate">{placement.school_name || "Yeshiva"}</p>
+                        <StatusBadge status={placement.status || "Recommended"} />
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {placement.recommended_date ? `Recommended ${fmtDate(placement.recommended_date)}` : "Recommendation"}
+                      </p>
+                    </div>
+                    {canPlace && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setFinalSchoolId(placement.school_id)}
+                      >
+                        Use as final
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-xl border border-gray-100 p-4 space-y-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="font-semibold text-gray-900">Final placement</h3>
+                <p className="text-xs text-gray-400 mt-1">Where he was placed when the case is ready to close.</p>
+              </div>
+              <StatusBadge status={caseIsClosed ? "Closed" : "Open"} />
+            </div>
+
+            {canPlace && (
+              <Combobox
+                options={yeshivaOptions}
+                value={selectedFinalSchoolId}
+                onChange={setFinalSchoolId}
+                placeholder="Search final yeshiva..."
+                emptyText="No yeshivas found."
+              />
+            )}
+
+            {finalPlacement || client.final_school_name ? (
+              <div className="rounded-lg bg-emerald-50 border border-emerald-100 p-3 text-sm text-emerald-800">
+                <p className="font-semibold">{finalPlacement?.school_name || client.final_school_name}</p>
+                <p className="text-xs mt-1">
+                  {finalPlacement?.closed_date || client.placement_closed_date
+                    ? `Closed ${fmtDate(finalPlacement?.closed_date || client.placement_closed_date)}`
+                    : "Saved as final placement"}
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400 rounded-lg border border-dashed border-gray-200 p-4 text-center">
+                No final placement selected yet.
+              </p>
+            )}
+
+            {canPlace && (
+              <div className="flex flex-col sm:flex-row gap-2">
+                {caseIsClosed ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    disabled={reopenPlacementCase.isPending}
+                    onClick={() => reopenPlacementCase.mutate()}
+                  >
+                    Reopen Case
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    className="w-full bg-[#1e3a5f] hover:bg-[#1e3a5f]/90"
+                    disabled={!selectedFinalSchoolId || closePlacementCase.isPending}
+                    onClick={() => closePlacementCase.mutate(selectedFinalSchoolId)}
+                  >
+                    Close Case
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </Section>
 
       <Section
         title="Evaluations"
@@ -765,7 +1051,7 @@ export default function ClientDetail() {
       />
       <BillingFormDialog
         open={billOpen} onOpenChange={setBillOpen}
-        clients={clients} record={{ client_id: id, client_name: name, service_type: "School Placement", billing_status: "Not Billed", amount: "" }}
+        clients={clients} record={{ client_id: id, client_name: name, service_type: "Yeshiva Placement", billing_status: "Not Billed", amount: "" }}
         onSave={(data) => createBill.mutateAsync(data)}
       />
     </div>

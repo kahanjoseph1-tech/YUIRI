@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import Combobox from "@/components/common/Combobox";
 import { suggestSchools } from "@/lib/matching";
 
-// "Match a Client" workflow: pick a client, see suggested schools, create placements.
+// "Match a Client" workflow: pick a client, see suggested yeshivas, create placements.
 export default function MatchClientDialog({ open, onOpenChange, clients = [], schools = [], onCreate }) {
   const [clientId, setClientId] = useState("");
   const [creating, setCreating] = useState(false);
@@ -48,7 +48,7 @@ export default function MatchClientDialog({ open, onOpenChange, clients = [], sc
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Match a Client to Schools</DialogTitle>
+          <DialogTitle>Match a Client to Yeshiva's</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
@@ -67,8 +67,8 @@ export default function MatchClientDialog({ open, onOpenChange, clients = [], sc
 
           {client && (
             <div className="space-y-2">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Suggested Schools</p>
-              {suggestions.length === 0 && <p className="text-sm text-gray-400">No schools in database yet.</p>}
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Suggested Yeshiva's</p>
+              {suggestions.length === 0 && <p className="text-sm text-gray-400">No yeshivas in database yet.</p>}
               {suggestions.map((entry) => (
                 <div key={entry.school.id} className="flex items-start gap-3 border border-gray-100 rounded-lg p-3">
                   <Badge variant="outline" className={`text-xs border ${scoreTone(entry.score)}`}>{entry.score}</Badge>

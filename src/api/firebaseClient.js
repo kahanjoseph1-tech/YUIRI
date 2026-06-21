@@ -156,6 +156,12 @@ function fromClient(id, data) {
     assigned_evaluator_id: data.assigned_evaluator_id || "",
     special_needs: Array.isArray(data.special_needs) ? data.special_needs : [],
     ready_to_bill: Boolean(data.ready_to_bill),
+    placement_status: data.placement_status || "Open",
+    final_school_id: data.final_school_id || "",
+    final_school_name: data.final_school_name || "",
+    final_placement_id: data.final_placement_id || "",
+    placement_closed_date: toIso(data.placement_closed_date),
+    placement_reopened_date: toIso(data.placement_reopened_date),
     notes: data.notes || "",
   };
 }
@@ -193,6 +199,12 @@ function toClient(data) {
     assigned_evaluator_id: data.assigned_evaluator_id,
     special_needs: data.special_needs,
     ready_to_bill: Boolean(data.ready_to_bill),
+    placement_status: data.placement_status,
+    final_school_id: data.final_school_id,
+    final_school_name: data.final_school_name,
+    final_placement_id: data.final_placement_id,
+    placement_closed_date: data.placement_closed_date,
+    placement_reopened_date: data.placement_reopened_date,
     notes: data.notes,
   });
 }

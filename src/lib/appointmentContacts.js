@@ -4,7 +4,7 @@ export const ATTENDEE_TYPES = [
   "Parents",
   "Boy",
   "Rabbi",
-  "School",
+  "Yeshiva",
   "Other",
 ];
 
@@ -58,6 +58,7 @@ export function appointmentAttendeeForClient(client, attendeeType) {
         attendee_phone: firstPhone(client),
       };
     case "School":
+    case "Yeshiva":
       return {
         attendee_name: clean(client.current_school),
         attendee_phone: "",

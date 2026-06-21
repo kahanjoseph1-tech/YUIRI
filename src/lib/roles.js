@@ -48,7 +48,7 @@ export const NAV_ITEMS = [
   { key: "Appointments", label: "Appointments", icon: "Calendar" },
   { key: "Evaluations", label: "Evaluations", icon: "ClipboardList" },
   { key: "OpenCases", label: "Open Cases", icon: "BriefcaseBusiness" },
-  { key: "Schools", label: "Schools", icon: "GraduationCap" },
+  { key: "Schools", label: "Yeshiva's", icon: "GraduationCap" },
   { key: "Placements", label: "Placements", icon: "ArrowRightLeft" },
   { key: "Billing", label: "Billing", icon: "DollarSign" },
   { key: "Reports", label: "Reports", icon: "BarChart3" },

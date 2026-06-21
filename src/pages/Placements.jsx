@@ -43,15 +43,24 @@ export default function Placements() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data, prev }) => {
-      const updated = await firebaseClient.entities.Placement.update(id, data);
-      if (data.status === "Enrolled" && prev?.status !== "Enrolled") {
-        await onPlacementEnrolled({ ...prev, ...data, id });
+      const nextData = data.status === "Enrolled"
+        ? {
+            ...data,
+            placement_type: data.placement_type || "Final Placement",
+            is_final: true,
+            closed_date: data.closed_date || new Date().toISOString(),
+          }
+        : data;
+      const updated = await firebaseClient.entities.Placement.update(id, nextData);
+      if (nextData.status === "Enrolled" && prev?.status !== "Enrolled") {
+        await onPlacementEnrolled({ ...prev, ...nextData, id });
       }
       return updated;
     },
     onSuccess: (_r, vars) => {
       queryClient.invalidateQueries({ queryKey: ["placements"] });
       queryClient.invalidateQueries({ queryKey: ["clients"] });
+      queryClient.invalidateQueries({ queryKey: ["open_cases"] });
       if (vars.data.status === "Enrolled" && vars.prev?.status !== "Enrolled") {
         toast.success("Enrolled — client marked Accepted");
       } else {
@@ -100,7 +109,7 @@ export default function Placements() {
             <TableHeader>
               <TableRow>
                 <TableHead>Client</TableHead>
-                <TableHead>School</TableHead>
+                <TableHead>Yeshiva</TableHead>
                 <TableHead>Match</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>

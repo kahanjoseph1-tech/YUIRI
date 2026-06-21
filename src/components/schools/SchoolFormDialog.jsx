@@ -56,7 +56,7 @@ export default function SchoolFormDialog({ open, onOpenChange, school, onSave })
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{school ? "Edit School" : "Add School"}</DialogTitle>
+          <DialogTitle>{school ? "Edit Yeshiva" : "Add Yeshiva"}</DialogTitle>
         </DialogHeader>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-3">
@@ -132,7 +132,7 @@ export default function SchoolFormDialog({ open, onOpenChange, school, onSave })
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={handleSave} disabled={saving || !form.name} className="bg-[#1e3a5f] hover:bg-[#1e3a5f]/90">
-            {saving ? "Saving..." : school ? "Update" : "Add School"}
+            {saving ? "Saving..." : school ? "Update" : "Add Yeshiva"}
           </Button>
         </DialogFooter>
       </DialogContent>

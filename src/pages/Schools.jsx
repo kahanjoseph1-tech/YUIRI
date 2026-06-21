@@ -37,12 +37,12 @@ export default function Schools() {
 
   const createMutation = useMutation({
     mutationFn: (data) => firebaseClient.entities.School.create(data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["schools"] }); toast.success("School added"); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["schools"] }); toast.success("Yeshiva added"); },
     onError: () => toast.error("Failed to add"),
   });
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => firebaseClient.entities.School.update(id, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["schools"] }); toast.success("School updated"); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["schools"] }); toast.success("Yeshiva updated"); },
     onError: () => toast.error("Failed to update"),
   });
 
@@ -60,12 +60,12 @@ export default function Schools() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Schools</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Yeshiva's</h1>
           <p className="text-sm text-gray-500 mt-1">{filtered.length} yeshivas</p>
         </div>
         {canWrite && (
           <Button onClick={() => setShowForm(true)} className="bg-[#1e3a5f] hover:bg-[#1e3a5f]/90 gap-2">
-            <Plus className="w-4 h-4" /> Add School
+            <Plus className="w-4 h-4" /> Add Yeshiva
           </Button>
         )}
       </div>
@@ -99,7 +99,7 @@ export default function Schools() {
       ) : filtered.length === 0 ? (
         <div className="text-center py-16">
           <GraduationCap className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-          <p className="text-gray-400 text-sm">No schools found</p>
+          <p className="text-gray-400 text-sm">No yeshivas found</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -149,9 +149,9 @@ export default function Schools() {
               </div>
 
               <div className="pt-4 border-t border-gray-100">
-                <h3 className="font-semibold text-gray-900 mb-2">Placements ({schoolPlacements.length})</h3>
+                <h3 className="font-semibold text-gray-900 mb-2">Placements at this yeshiva ({schoolPlacements.length})</h3>
                 {schoolPlacements.length === 0 ? (
-                  <p className="text-sm text-gray-400">No placements at this school yet.</p>
+                  <p className="text-sm text-gray-400">No placements at this yeshiva yet.</p>
                 ) : (
                   <div className="space-y-2">
                     {schoolPlacements.map((p) => (
@@ -166,7 +166,7 @@ export default function Schools() {
 
               {canWrite && (
                 <Button className="mt-4 gap-2 bg-[#1e3a5f] hover:bg-[#1e3a5f]/90" onClick={() => { setEditSchool(viewSchool); setViewSchool(null); }}>
-                  <Pencil className="w-4 h-4" /> Edit School
+                  <Pencil className="w-4 h-4" /> Edit Yeshiva
                 </Button>
               )}
             </>
