@@ -11,7 +11,11 @@ import StatusBadge from "@/components/StatusBadge";
 import BillingFormDialog from "@/components/billing/BillingFormDialog";
 import RecordPaymentDialog from "@/components/billing/RecordPaymentDialog";
 import { BILLING_STATUSES } from "@/lib/constants";
-import { nextInvoiceNumber } from "@/lib/automations";
+import {
+  nextInvoiceNumber,
+  recordFinancialTransactionForBillingPayment,
+  syncFinancialTransactionForBillingPayment,
+} from "@/lib/automations";
 import { can } from "@/lib/roles";
 import { useRole } from "@/lib/useRole";
 import { fmtCurrency } from "@/lib/format";
@@ -33,15 +37,43 @@ export default function Billing() {
     queryKey: ["clients"], queryFn: () => firebaseClient.entities.Client.list("-created_date", 1000),
   });
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["billing"] });
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ["billing"] });
+    queryClient.invalidateQueries({ queryKey: ["financials"] });
+  };
 
   const createMutation = useMutation({
-    mutationFn: (data) => firebaseClient.entities.BillingRecord.create(data),
+    mutationFn: async (data) => {
+      const created = await firebaseClient.entities.BillingRecord.create(data);
+      await syncFinancialTransactionForBillingPayment(created);
+      return created;
+    },
     onSuccess: () => { invalidate(); toast.success("Billing record created"); },
     onError: () => toast.error("Failed to create"),
   });
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => firebaseClient.entities.BillingRecord.update(id, data),
+    mutationFn: async ({ id, data }) => {
+      const {
+        payment_amount_received,
+        payment_event_id,
+        ...billingPatch
+      } = data;
+      const updated = await firebaseClient.entities.BillingRecord.update(id, billingPatch);
+
+      if (payment_event_id && Number(payment_amount_received || 0) > 0) {
+        await recordFinancialTransactionForBillingPayment(updated, {
+          amount: Number(payment_amount_received),
+          eventId: payment_event_id,
+          transactionDate: billingPatch.payment_date,
+          paymentMethod: billingPatch.payment_method,
+          notes: billingPatch.payment_note,
+        });
+      } else {
+        await syncFinancialTransactionForBillingPayment(updated);
+      }
+
+      return updated;
+    },
     onSuccess: () => { invalidate(); toast.success("Updated"); },
     onError: () => toast.error("Update failed"),
   });

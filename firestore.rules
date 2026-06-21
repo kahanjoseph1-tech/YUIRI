@@ -101,6 +101,10 @@ service cloud.firestore {
       allow read, write: if currentUserIsApproved();
     }
 
+    match /financials/{document} {
+      allow read, write: if currentUserIsApproved();
+    }
+
     match /schools/{document} {
       allow read, write: if currentUserIsApproved();
     }

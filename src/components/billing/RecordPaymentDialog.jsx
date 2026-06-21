@@ -10,28 +10,42 @@ import { fmtCurrency } from "@/lib/format";
 
 // Records a payment against a billing record. onSave receives the patch.
 export default function RecordPaymentDialog({ open, onOpenChange, record, onSave }) {
-  const [amountPaid, setAmountPaid] = useState("");
+  const [paymentAmount, setPaymentAmount] = useState("");
   const [method, setMethod] = useState("");
+  const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setAmountPaid(record?.amount != null ? String(record.amount) : "");
+      const amountDue = Number(record?.amount || 0);
+      const previousPaid = Number(record?.amount_paid || 0);
+      setPaymentAmount(String(Math.max(amountDue - previousPaid, 0) || amountDue || ""));
       setMethod(record?.payment_method || "");
+      setNote(record?.payment_note || "");
     }
   }, [open, record]);
 
   const amountDue = Number(record?.amount) || 0;
-  const nextStatus = computePaymentStatus(amountDue, Number(amountPaid));
+  const previousPaid = Number(record?.amount_paid || 0);
+  const receivedAmount = Number(paymentAmount || 0);
+  const totalPaid = previousPaid + receivedAmount;
+  const nextStatus = computePaymentStatus(amountDue, totalPaid);
 
   const handleSave = async () => {
+    if (receivedAmount <= 0) return;
     setSaving(true);
     try {
+      const paymentDate = new Date().toISOString();
       const patch = {
         billing_status: nextStatus,
         payment_method: method,
+        payment_note: note,
+        payment_date: paymentDate,
+        amount_paid: totalPaid,
+        payment_amount_received: receivedAmount,
+        payment_event_id: `${record.id}_${Date.now()}`,
       };
-      if (nextStatus === "Paid") patch.paid_date = new Date().toISOString().slice(0, 10);
+      if (nextStatus === "Paid") patch.paid_date = paymentDate;
       await onSave(patch);
       onOpenChange(false);
     } finally {
@@ -50,9 +64,18 @@ export default function RecordPaymentDialog({ open, onOpenChange, record, onSave
           <p className="text-sm text-gray-500">
             {record?.client_name} — invoice {record?.invoice_number || "(none)"} · due {fmtCurrency(amountDue)}
           </p>
+          {previousPaid > 0 && (
+            <p className="text-xs text-gray-400">Already recorded: {fmtCurrency(previousPaid)}</p>
+          )}
           <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-gray-500">Amount Paid</Label>
-            <Input type="number" value={amountPaid} onChange={(e) => setAmountPaid(e.target.value)} />
+            <Label className="text-xs font-medium text-gray-500">Payment Received</Label>
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={paymentAmount}
+              onChange={(e) => setPaymentAmount(e.target.value)}
+            />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs font-medium text-gray-500">Payment Method</Label>
@@ -61,12 +84,16 @@ export default function RecordPaymentDialog({ open, onOpenChange, record, onSave
               <SelectContent>{PAYMENT_METHODS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
             </Select>
           </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-gray-500">Payment Note</Label>
+            <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Check number, memo, or note" />
+          </div>
           <p className="text-xs text-gray-400">New status: <span className="font-medium text-gray-600">{nextStatus}</span></p>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSave} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
+          <Button onClick={handleSave} disabled={saving || receivedAmount <= 0} className="bg-emerald-600 hover:bg-emerald-700">
             {saving ? "Saving..." : "Record Payment"}
           </Button>
         </DialogFooter>

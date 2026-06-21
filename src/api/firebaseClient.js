@@ -20,6 +20,7 @@ const collectionNames = {
   OpenCase: "open_cases",
   FollowUp: "follow_ups",
   BillingRecord: "billing",
+  FinancialTransaction: "financials",
   School: "schools",
   Placement: "placements",
 };
@@ -365,9 +366,11 @@ function fromBillingRecord(id, data) {
     service_type: data.service_type || "",
     appointment_date: toIso(data.appointment_date),
     amount: Number(data.amount || 0),
+    amount_paid: Number(data.amount_paid || 0),
     billing_status: data.billing_status || "Not Billed",
     invoice_number: data.invoice_number || "",
     paid_date: toIso(data.paid_date),
+    payment_date: toIso(data.payment_date),
     payment_method: data.payment_method || "",
     payment_note: data.payment_note || "",
     card_last4: data.card_last4 || "",
@@ -384,15 +387,52 @@ function toBillingRecord(data) {
     client_name: data.client_name,
     service_type: data.service_type,
     appointment_date: data.appointment_date,
-    amount: Number(data.amount || 0),
-    billing_status: data.billing_status || "Not Billed",
+    amount: data.amount === undefined ? undefined : Number(data.amount || 0),
+    amount_paid: data.amount_paid === undefined ? undefined : Number(data.amount_paid || 0),
+    billing_status: data.billing_status,
     invoice_number: data.invoice_number,
     paid_date: data.paid_date,
+    payment_date: data.payment_date,
     payment_method: data.payment_method,
     payment_note: data.payment_note,
-    card_last4: String(data.card_last4 || "").replace(/\D/g, "").slice(-4),
+    card_last4: data.card_last4 === undefined
+      ? undefined
+      : String(data.card_last4 || "").replace(/\D/g, "").slice(-4),
     evaluation_billing_answer: data.evaluation_billing_answer,
     evaluation_billing_note: data.evaluation_billing_note,
+    notes: data.notes,
+  });
+}
+
+function fromFinancialTransaction(id, data) {
+  return {
+    ...withDates(id, data),
+    transaction_type: data.transaction_type || "Income",
+    transaction_date: toIso(data.transaction_date),
+    amount: Number(data.amount || 0),
+    category: data.category || "",
+    description: data.description || "",
+    client_id: data.client_id || "",
+    client_name: data.client_name || "",
+    billing_record_id: data.billing_record_id || "",
+    payment_method: data.payment_method || "",
+    source: data.source || "Manual",
+    notes: data.notes || "",
+  };
+}
+
+function toFinancialTransaction(data) {
+  return compact({
+    transaction_type: data.transaction_type,
+    transaction_date: data.transaction_date,
+    amount: data.amount === undefined ? undefined : Number(data.amount || 0),
+    category: data.category,
+    description: data.description,
+    client_id: data.client_id,
+    client_name: data.client_name,
+    billing_record_id: data.billing_record_id,
+    payment_method: data.payment_method,
+    source: data.source,
     notes: data.notes,
   });
 }
@@ -416,6 +456,7 @@ const transforms = {
   OpenCase: { fromDb: identityFromDb, toDb: compact },
   FollowUp: { fromDb: identityFromDb, toDb: compact },
   BillingRecord: { fromDb: fromBillingRecord, toDb: toBillingRecord },
+  FinancialTransaction: { fromDb: fromFinancialTransaction, toDb: toFinancialTransaction },
   School: { fromDb: identityFromDb, toDb: compact },
   Placement: { fromDb: identityFromDb, toDb: compact },
 };

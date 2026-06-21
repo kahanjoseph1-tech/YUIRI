@@ -255,6 +255,79 @@ export function computePaymentStatus(amountDue, amountPaid) {
   return "Invoice Sent";
 }
 
+export function financialTransactionIdForBillingPayment(record, eventId) {
+  if (eventId) return `billing_payment_${eventId}`;
+  if (!record?.id) return "";
+  return `billing_payment_${record.id}`;
+}
+
+function billingPaymentAmount(record) {
+  const paid = Number(record?.amount_paid || 0);
+  if (paid > 0) return paid;
+  if (record?.billing_status === "Paid") return Number(record?.amount || 0);
+  return 0;
+}
+
+export async function recordFinancialTransactionForBillingPayment(record, options = {}) {
+  if (!record?.id) return null;
+
+  const amount = Number(options.amount || 0);
+  if (amount <= 0) return null;
+
+  const transactionDate = options.transactionDate || record.payment_date || record.paid_date || new Date().toISOString();
+  const transactionId = financialTransactionIdForBillingPayment(record, options.eventId || options.transactionId);
+
+  return firebaseClient.entities.FinancialTransaction.upsert(transactionId, {
+    transaction_type: "Income",
+    transaction_date: transactionDate,
+    amount,
+    category: record.service_type || "Client Payment",
+    description: `${record.client_name || "Client"} payment${record.invoice_number ? ` - ${record.invoice_number}` : ""}`,
+    client_id: record.client_id || "",
+    client_name: record.client_name || "",
+    billing_record_id: record.id,
+    payment_method: options.paymentMethod || record.payment_method || "",
+    source: "Billing Payment",
+    notes: options.notes || record.payment_note || "",
+  });
+}
+
+export async function syncFinancialTransactionForBillingPayment(record) {
+  if (!record?.id) return null;
+
+  const stableId = financialTransactionIdForBillingPayment(record);
+  const amount = billingPaymentAmount(record);
+  const isPaid = ["Paid", "Partially Paid"].includes(record.billing_status);
+
+  if (!isPaid || amount <= 0) {
+    try {
+      const existing = await firebaseClient.entities.FinancialTransaction.get(stableId);
+      if (existing) await firebaseClient.entities.FinancialTransaction.delete(stableId);
+    } catch {
+      // If cleanup fails, the billing update should still succeed.
+    }
+    return null;
+  }
+
+  try {
+    const transactions = await firebaseClient.entities.FinancialTransaction.list("-created_date", 1000);
+    const hasPaymentEvents = transactions.some((transaction) =>
+      transaction.billing_record_id === record.id &&
+      transaction.source === "Billing Payment" &&
+      transaction.id !== stableId
+    );
+    if (hasPaymentEvents) return null;
+  } catch {
+    // If lookup fails, fall back to the deterministic summary transaction.
+  }
+
+  return recordFinancialTransactionForBillingPayment(record, {
+    amount,
+    transactionId: record.id,
+    transactionDate: record.payment_date || record.paid_date || record.updated_date || new Date().toISOString(),
+  });
+}
+
 // 5. Placement -> "Enrolled": mark the client as "Accepted".
 export async function onPlacementEnrolled(placement) {
   if (placement?.client_id) {
