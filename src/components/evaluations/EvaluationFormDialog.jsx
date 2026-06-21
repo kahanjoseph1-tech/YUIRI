@@ -22,6 +22,13 @@ const singleChoiceQuestions = [
   { key: "learning", settingsKey: "evaluation_learning_options", label: "לערנען", options: ["מצוין", "טוב מאוד", "טוב", "חלוש"] },
 ];
 
+const keyPointQuestions = [
+  { key: "zicht_far", settingsKey: "evaluation_key_points_zicht_far_options", label: "זיכט פאר" },
+  { key: "shiur", settingsKey: "evaluation_key_points_shiur_options", label: "שיעור" },
+  { key: "style", settingsKey: "evaluation_key_points_style_options", label: "סטייל" },
+  { key: "dormitory", settingsKey: "evaluation_key_points_dormitory_options", label: "דארמעטארי" },
+];
+
 const checkboxQuestions = [
   { key: "friends", settingsKey: "evaluation_friends_options", label: "חברים", options: ["1", "2", "3", "4", "5", OTHER_OPTION] },
   { key: "chavrusas", settingsKey: "evaluation_chavrusas_options", label: "חברותה'ס", options: ["נארמאל", "געפלאגט", "אינגערמאן", OTHER_OPTION] },
@@ -70,6 +77,10 @@ function defaultQuestionnaire() {
   return defaults;
 }
 
+function defaultKeyPoints() {
+  return Object.fromEntries(keyPointQuestions.map((question) => [question.key, ""]));
+}
+
 function asArray(value) {
   return Array.isArray(value) ? value : [];
 }
@@ -93,9 +104,14 @@ export default function EvaluationFormDialog({ open, onOpenChange, evaluation, o
   });
 
   const blankQuestionnaire = useMemo(() => defaultQuestionnaire(), []);
+  const blankKeyPoints = useMemo(() => defaultKeyPoints(), []);
   const questionnaire = useMemo(
     () => ({ ...blankQuestionnaire, ...(form.questionnaire || {}) }),
     [blankQuestionnaire, form.questionnaire]
+  );
+  const keyPoints = useMemo(
+    () => ({ ...blankKeyPoints, ...(form.key_points || {}) }),
+    [blankKeyPoints, form.key_points]
   );
 
   const optionsForQuestion = (question) => {
@@ -112,6 +128,11 @@ export default function EvaluationFormDialog({ open, onOpenChange, evaluation, o
     form.evaluation_billing_answer,
   ]);
 
+  const optionsForKeyPoint = (question) => uniqueOptions([
+    ...(dropdownOptions[question.settingsKey] || DEFAULT_DROPDOWN_OPTIONS[question.settingsKey] || []),
+    keyPoints[question.key],
+  ]);
+
   useEffect(() => {
     if (open) {
       setForm({
@@ -119,6 +140,10 @@ export default function EvaluationFormDialog({ open, onOpenChange, evaluation, o
         questionnaire: {
           ...defaultQuestionnaire(),
           ...(evaluation?.questionnaire || {}),
+        },
+        key_points: {
+          ...defaultKeyPoints(),
+          ...(evaluation?.key_points || {}),
         },
         evaluation_billing_answer: evaluation?.evaluation_billing_answer || "",
         evaluation_billing_note: evaluation?.evaluation_billing_note || "",
@@ -134,6 +159,17 @@ export default function EvaluationFormDialog({ open, onOpenChange, evaluation, o
       questionnaire: {
         ...defaultQuestionnaire(),
         ...(previous.questionnaire || {}),
+        [field]: value,
+      },
+    }));
+  };
+
+  const updateKeyPoint = (field, value) => {
+    setForm((previous) => ({
+      ...previous,
+      key_points: {
+        ...defaultKeyPoints(),
+        ...(previous.key_points || {}),
         [field]: value,
       },
     }));
@@ -156,6 +192,10 @@ export default function EvaluationFormDialog({ open, onOpenChange, evaluation, o
             ...defaultQuestionnaire(),
             ...(form.questionnaire || {}),
           },
+          key_points: {
+            ...defaultKeyPoints(),
+            ...(form.key_points || {}),
+          },
         },
         nextStatus
       );
@@ -173,6 +213,34 @@ export default function EvaluationFormDialog({ open, onOpenChange, evaluation, o
         </DialogHeader>
 
         <div className="space-y-5 py-3">
+          <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-4">
+            <div className="mb-4">
+              <h3 className="font-semibold text-gray-900">Key points</h3>
+              <p className="text-xs text-gray-500 mt-1">Quick summary fields for the evaluation report.</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4" dir="rtl">
+              {keyPointQuestions.map((question) => (
+                <Field key={question.key} label={question.label}>
+                  <Select
+                    value={keyPoints[question.key] || ""}
+                    onValueChange={(value) => updateKeyPoint(question.key, value)}
+                  >
+                    <SelectTrigger className="text-right bg-white" dir="rtl">
+                      <SelectValue placeholder="קלייב אויס" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {optionsForKeyPoint(question).map((option) => (
+                        <SelectItem key={option} value={option} className="text-right" dir="rtl">
+                          {option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              ))}
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4" dir="rtl">
             {singleChoiceQuestions.map((question) => (
               <Field key={question.key} label={question.label}>

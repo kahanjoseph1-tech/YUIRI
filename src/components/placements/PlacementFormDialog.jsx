@@ -1,16 +1,32 @@
-import React, { useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PLACEMENT_STATUSES } from "@/lib/constants";
+import {
+  DEFAULT_DROPDOWN_OPTIONS,
+  DROPDOWN_OPTIONS_QUERY_KEY,
+  getDropdownOptions,
+  uniqueOptions,
+} from "@/lib/dropdownSettings";
 
 // Edit an existing placement (status, dates, notes).
 export default function PlacementFormDialog({ open, onOpenChange, placement, onSave }) {
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
+
+  const { data: dropdownOptions = DEFAULT_DROPDOWN_OPTIONS } = useQuery({
+    queryKey: DROPDOWN_OPTIONS_QUERY_KEY,
+    queryFn: getDropdownOptions,
+  });
+
+  const placementStatusOptions = useMemo(
+    () => uniqueOptions([...(dropdownOptions.placement_statuses || []), form.status]),
+    [dropdownOptions.placement_statuses, form.status]
+  );
 
   useEffect(() => {
     if (open) setForm(placement || {});
@@ -40,7 +56,7 @@ export default function PlacementFormDialog({ open, onOpenChange, placement, onS
             <Label className="text-xs font-medium text-gray-500">Status</Label>
             <Select value={form.status || ""} onValueChange={(v) => update("status", v)}>
               <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
-              <SelectContent>{PLACEMENT_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+              <SelectContent>{placementStatusOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="grid grid-cols-2 gap-4">

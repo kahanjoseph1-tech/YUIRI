@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,12 +7,35 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Combobox from "@/components/common/Combobox";
-import { SERVICE_TYPES, BILLING_STATUSES, PAYMENT_METHODS } from "@/lib/constants";
+import {
+  DEFAULT_DROPDOWN_OPTIONS,
+  DROPDOWN_OPTIONS_QUERY_KEY,
+  getDropdownOptions,
+  uniqueOptions,
+} from "@/lib/dropdownSettings";
 
 // Create or edit a billing record.
 export default function BillingFormDialog({ open, onOpenChange, record, clients = [], onSave }) {
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
+
+  const { data: dropdownOptions = DEFAULT_DROPDOWN_OPTIONS } = useQuery({
+    queryKey: DROPDOWN_OPTIONS_QUERY_KEY,
+    queryFn: getDropdownOptions,
+  });
+
+  const serviceTypeOptions = useMemo(
+    () => uniqueOptions([...(dropdownOptions.billing_service_types || []), form.service_type]),
+    [dropdownOptions.billing_service_types, form.service_type]
+  );
+  const billingStatusOptions = useMemo(
+    () => uniqueOptions([...(dropdownOptions.billing_statuses || []), form.billing_status]),
+    [dropdownOptions.billing_statuses, form.billing_status]
+  );
+  const paymentMethodOptions = useMemo(
+    () => uniqueOptions([...(dropdownOptions.payment_methods || []), form.payment_method]),
+    [dropdownOptions.payment_methods, form.payment_method]
+  );
 
   useEffect(() => {
     if (open) {
@@ -56,7 +80,7 @@ export default function BillingFormDialog({ open, onOpenChange, record, clients 
               <Label className="text-xs font-medium text-gray-500">Service Type</Label>
               <Select value={form.service_type || ""} onValueChange={(v) => update("service_type", v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{SERVICE_TYPES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                <SelectContent>{serviceTypeOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
@@ -73,7 +97,7 @@ export default function BillingFormDialog({ open, onOpenChange, record, clients 
               <Label className="text-xs font-medium text-gray-500">Status</Label>
               <Select value={form.billing_status || ""} onValueChange={(v) => update("billing_status", v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{BILLING_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                <SelectContent>{billingStatusOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           </div>
@@ -82,7 +106,7 @@ export default function BillingFormDialog({ open, onOpenChange, record, clients 
               <Label className="text-xs font-medium text-gray-500">Payment Method</Label>
               <Select value={form.payment_method || ""} onValueChange={(v) => update("payment_method", v)}>
                 <SelectTrigger><SelectValue placeholder="Select method" /></SelectTrigger>
-                <SelectContent>{PAYMENT_METHODS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
+                <SelectContent>{paymentMethodOptions.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">

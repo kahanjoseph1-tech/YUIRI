@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,7 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { SCHOOL_HASHKAFAS, SCHOOL_TYPES, ENVIRONMENT_TYPES } from "@/lib/constants";
+import {
+  DEFAULT_DROPDOWN_OPTIONS,
+  DROPDOWN_OPTIONS_QUERY_KEY,
+  getDropdownOptions,
+  uniqueOptions,
+} from "@/lib/dropdownSettings";
 
 const EMPTY = {
   name: "", type: "", location: "", address: "", phone: "", email: "", website: "",
@@ -28,6 +34,24 @@ export default function SchoolFormDialog({ open, onOpenChange, school, onSave })
   const [form, setForm] = useState(EMPTY);
   const [specialtiesText, setSpecialtiesText] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const { data: dropdownOptions = DEFAULT_DROPDOWN_OPTIONS } = useQuery({
+    queryKey: DROPDOWN_OPTIONS_QUERY_KEY,
+    queryFn: getDropdownOptions,
+  });
+
+  const typeOptions = useMemo(
+    () => uniqueOptions([...(dropdownOptions.yeshiva_types || []), form.type]),
+    [dropdownOptions.yeshiva_types, form.type]
+  );
+  const hashkafaOptions = useMemo(
+    () => uniqueOptions([...(dropdownOptions.yeshiva_hashkafas || []), form.hashkafa]),
+    [dropdownOptions.yeshiva_hashkafas, form.hashkafa]
+  );
+  const environmentOptions = useMemo(
+    () => uniqueOptions([...(dropdownOptions.yeshiva_environment_types || []), form.environment_type]),
+    [dropdownOptions.yeshiva_environment_types, form.environment_type]
+  );
 
   useEffect(() => {
     if (open) {
@@ -66,19 +90,19 @@ export default function SchoolFormDialog({ open, onOpenChange, school, onSave })
           <Field label="Type">
             <Select value={form.type || ""} onValueChange={(v) => update("type", v)}>
               <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
-              <SelectContent>{SCHOOL_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+              <SelectContent>{typeOptions.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
             </Select>
           </Field>
           <Field label="Hashkafa">
             <Select value={form.hashkafa || ""} onValueChange={(v) => update("hashkafa", v)}>
               <SelectTrigger><SelectValue placeholder="Select hashkafa" /></SelectTrigger>
-              <SelectContent>{SCHOOL_HASHKAFAS.map((h) => <SelectItem key={h} value={h}>{h}</SelectItem>)}</SelectContent>
+              <SelectContent>{hashkafaOptions.map((h) => <SelectItem key={h} value={h}>{h}</SelectItem>)}</SelectContent>
             </Select>
           </Field>
           <Field label="Environment Type">
             <Select value={form.environment_type || ""} onValueChange={(v) => update("environment_type", v)}>
               <SelectTrigger><SelectValue placeholder="Select environment" /></SelectTrigger>
-              <SelectContent>{ENVIRONMENT_TYPES.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}</SelectContent>
+              <SelectContent>{environmentOptions.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}</SelectContent>
             </Select>
           </Field>
           <Field label="Location (City/Area)">

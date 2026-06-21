@@ -33,6 +33,13 @@ const questionnaireFields = [
   { key: "notes", label: "הערות" },
 ];
 
+const keyPointFields = [
+  { key: "zicht_far", label: "זיכט פאר" },
+  { key: "shiur", label: "שיעור" },
+  { key: "style", label: "סטייל" },
+  { key: "dormitory", label: "דארמעטארי" },
+];
+
 function fullName(client, fallback = "") {
   const name = `${client?.boy_first_name || ""} ${client?.boy_last_name || ""}`.trim();
   return name || fallback;
@@ -60,6 +67,10 @@ function questionnaireAnswer(evaluation, key) {
   const answer = formatList(questionnaire[key]);
   const other = questionnaire[`${key}_other`];
   return other ? `${answer}${answer ? " - " : ""}${other}` : answer;
+}
+
+function keyPointAnswer(evaluation, key) {
+  return evaluation?.key_points?.[key] || "";
 }
 
 function escapeHtml(value) {
@@ -137,6 +148,12 @@ const exportFields = [
   { key: "appointment_date", label: "Appointment Date", group: "Evaluation", get: ({ evaluation, openCase }) => fmtDateTime(evaluation?.appointment_date || openCase.appointment_date, "") },
   { key: "billing_answer", label: "Evaluation Billing Answer", group: "Evaluation", get: ({ evaluation }) => evaluation?.evaluation_billing_answer || "" },
   { key: "billing_note", label: "Evaluation Billing Note", group: "Evaluation", get: ({ evaluation }) => evaluation?.evaluation_billing_note || "" },
+  ...keyPointFields.map((field) => ({
+    key: `key_point_${field.key}`,
+    label: field.label,
+    group: "Key Points",
+    get: ({ evaluation }) => keyPointAnswer(evaluation, field.key),
+  })),
   ...questionnaireFields.map((field) => ({
     key: `question_${field.key}`,
     label: field.label,

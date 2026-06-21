@@ -13,7 +13,6 @@ import {
   getDropdownOptions,
   uniqueOptions,
 } from "@/lib/dropdownSettings";
-import { PAYMENT_METHODS } from "@/lib/constants";
 import { ATTENDEE_TYPES, appointmentAttendeeForClient } from "@/lib/appointmentContacts";
 
 // Converts a stored ISO datetime to a value for <input type="datetime-local">.
@@ -134,6 +133,11 @@ export default function AppointmentFormDialog({
   const locationOptions = useMemo(
     () => uniqueOptions([...(dropdownOptions.appointment_locations || []), form.location]),
     [dropdownOptions.appointment_locations, form.location]
+  );
+
+  const paymentMethodOptions = useMemo(
+    () => uniqueOptions([...(dropdownOptions.payment_methods || []), form.payment_method]),
+    [dropdownOptions.payment_methods, form.payment_method]
   );
 
   const selectedClient = clients.find((c) => c.id === form.client_id);
@@ -308,7 +312,7 @@ export default function AppointmentFormDialog({
                 <Label className="text-xs font-medium text-gray-500">Payment Method</Label>
                 <Select value={form.payment_method || ""} onValueChange={(v) => update("payment_method", v)}>
                   <SelectTrigger><SelectValue placeholder="Select method" /></SelectTrigger>
-                  <SelectContent>{PAYMENT_METHODS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
+                  <SelectContent>{paymentMethodOptions.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
             </div>

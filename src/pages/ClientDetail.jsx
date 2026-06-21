@@ -59,6 +59,13 @@ const QUESTION_FIELDS = [
   { key: "notes", label: "הערות" },
 ];
 
+const KEY_POINT_FIELDS = [
+  { key: "zicht_far", label: "זיכט פאר" },
+  { key: "shiur", label: "שיעור" },
+  { key: "style", label: "סטייל" },
+  { key: "dormitory", label: "דארמעטארי" },
+];
+
 const FOLLOW_UP_EMPTY = {
   type: "Task",
   evaluation_id: "none",
@@ -106,6 +113,13 @@ function questionnaireAnswer(evaluation, key) {
   const answer = formatList(questionnaire[key]);
   const other = questionnaire[`${key}_other`];
   return other ? `${answer}${answer ? " - " : ""}${other}` : answer;
+}
+
+function keyPointRows(evaluation) {
+  const keyPoints = evaluation?.key_points || {};
+  return KEY_POINT_FIELDS
+    .map((field) => ({ ...field, value: keyPoints[field.key] || "" }))
+    .filter((field) => field.value);
 }
 
 function isoFromLocalInput(value) {
@@ -178,6 +192,7 @@ function EvaluationCard({ evaluation, index, onAddFollowUp }) {
   const answers = QUESTION_FIELDS
     .map((field) => ({ ...field, value: questionnaireAnswer(evaluation, field.key) }))
     .filter((field) => field.value);
+  const keyPoints = keyPointRows(evaluation);
 
   return (
     <div className="rounded-xl border border-gray-100 overflow-hidden">
@@ -210,6 +225,20 @@ function EvaluationCard({ evaluation, index, onAddFollowUp }) {
           <div className="rounded-lg bg-amber-50 border border-amber-100 px-3 py-2 text-sm text-amber-800">
             <span className="font-medium">Billing:</span> {evaluation.evaluation_billing_answer || "No answer"}
             {evaluation.evaluation_billing_note ? ` - ${evaluation.evaluation_billing_note}` : ""}
+          </div>
+        )}
+
+        {keyPoints.length > 0 && (
+          <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-3">
+            <h4 className="text-sm font-semibold text-gray-900 mb-3">Key points</h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2" dir="rtl">
+              {keyPoints.map((point) => (
+                <div key={point.key} className="rounded-lg bg-white border border-blue-100 px-3 py-2">
+                  <p className="text-[11px] text-gray-400">{point.label}</p>
+                  <p className="text-sm font-semibold text-gray-900 mt-1">{point.value}</p>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -534,6 +563,7 @@ export default function ClientDetail() {
 
   const openTasks = myFollowUps.filter((record) => record.type === "Task" && record.status !== "Done");
   const latestEval = myEvals[0];
+  const latestKeyPoints = keyPointRows(latestEval);
   const name = fullName(client);
   const yeshivaOptions = schools.map((school) => ({
     value: school.id,
@@ -696,6 +726,23 @@ export default function ClientDetail() {
                 <p className="text-sm text-gray-400 mt-2">No evaluation yet.</p>
               )}
             </div>
+
+            {latestKeyPoints.length > 0 && (
+              <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-4">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <p className="text-sm font-semibold text-gray-900">Key points</p>
+                  <StatusBadge status="Evaluation" />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2" dir="rtl">
+                  {latestKeyPoints.map((point) => (
+                    <div key={point.key} className="rounded-lg bg-white border border-blue-100 px-3 py-2">
+                      <p className="text-[11px] text-gray-400">{point.label}</p>
+                      <p className="text-sm font-semibold text-gray-900 mt-1">{point.value}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {(client.special_needs?.length > 0 || client.family_expectations || client.notes) ? (
               <div className="space-y-3 text-sm">

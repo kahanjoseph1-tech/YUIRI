@@ -2,11 +2,18 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
   APPOINTMENT_STATUSES,
+  BILLING_STATUSES,
   CLIENT_STATUSES,
   DEFAULT_CALLER_OPTIONS,
   DEFAULT_RESPONSIBLE_OPTIONS,
+  ENVIRONMENT_TYPES,
   MEETING_TYPES,
+  PAYMENT_METHODS,
   PHONE_NUMBER_TAGS,
+  PLACEMENT_STATUSES,
+  SCHOOL_HASHKAFAS,
+  SCHOOL_TYPES,
+  SERVICE_TYPES,
 } from "@/lib/constants";
 
 const SETTINGS_COLLECTION = "settings";
@@ -26,6 +33,10 @@ const DEFAULT_EVALUATION_EMOTIONAL_OPTIONS = ["יא", "אביסל", "ניין", 
 const DEFAULT_EVALUATION_MIDOS_OPTIONS = ["פיינע", "קען זיין בעסער", "Other"];
 const DEFAULT_EVALUATION_DERECH_ERETZ_OPTIONS = ["יא", "ניין", "קען זיין בעסער"];
 const DEFAULT_EVALUATION_BILLING_ANSWERS = ["געברענגט געלט", "דארף מען בילן", "נישט זיכער"];
+
+const DEFAULT_KEY_POINT_ZICHT_FAR_OPTIONS = ["Yeshiva Ketana", "Mesivta", "Beis Medrash", "Special Education", "Other"];
+const DEFAULT_KEY_POINT_SHIUR_OPTIONS = [];
+const DEFAULT_KEY_POINT_STYLE_OPTIONS = ["Chassidish", "Yeshivish", "Structured", "Warm/Nurturing", "Other"];
 
 export const DROPDOWN_SECTIONS = [
   {
@@ -68,7 +79,36 @@ export const DROPDOWN_SECTIONS = [
       "evaluation_strengthened_learning_davening_options",
       "evaluation_bad_friend_strengthened_options",
       "evaluation_likes_music_options",
+      "evaluation_key_points_zicht_far_options",
+      "evaluation_key_points_shiur_options",
+      "evaluation_key_points_style_options",
+      "evaluation_key_points_dormitory_options",
       "evaluation_billing_answers",
+    ],
+  },
+  {
+    key: "yeshivas",
+    label: "Yeshiva's",
+    groupKeys: [
+      "yeshiva_hashkafas",
+      "yeshiva_types",
+      "yeshiva_environment_types",
+    ],
+  },
+  {
+    key: "placements",
+    label: "Placements",
+    groupKeys: [
+      "placement_statuses",
+    ],
+  },
+  {
+    key: "billing",
+    label: "Billing",
+    groupKeys: [
+      "billing_service_types",
+      "billing_statuses",
+      "payment_methods",
     ],
   },
 ];
@@ -109,6 +149,20 @@ export const DROPDOWN_GROUPS = [
   { key: "evaluation_billing_answers", label: "באצאלט / בילינג", section: "evaluations" },
 ];
 
+DROPDOWN_GROUPS.push(
+  { key: "evaluation_key_points_zicht_far_options", label: "זיכט פאר", section: "evaluations" },
+  { key: "evaluation_key_points_shiur_options", label: "שיעור", section: "evaluations" },
+  { key: "evaluation_key_points_style_options", label: "סטייל", section: "evaluations" },
+  { key: "evaluation_key_points_dormitory_options", label: "דארמעטארי", section: "evaluations" },
+  { key: "yeshiva_hashkafas", label: "Hashkafa", section: "yeshivas" },
+  { key: "yeshiva_types", label: "Yeshiva type", section: "yeshivas" },
+  { key: "yeshiva_environment_types", label: "Environment type", section: "yeshivas" },
+  { key: "placement_statuses", label: "Placement status", section: "placements" },
+  { key: "billing_service_types", label: "Service type", section: "billing" },
+  { key: "billing_statuses", label: "Billing status", section: "billing" },
+  { key: "payment_methods", label: "Payment method", section: "billing" },
+);
+
 export const DEFAULT_DROPDOWN_OPTIONS = {
   caller_options: DEFAULT_CALLER_OPTIONS,
   responsible_options: DEFAULT_RESPONSIBLE_OPTIONS,
@@ -134,7 +188,18 @@ export const DEFAULT_DROPDOWN_OPTIONS = {
   evaluation_strengthened_learning_davening_options: DEFAULT_EVALUATION_YES_NO_OTHER_OPTIONS,
   evaluation_bad_friend_strengthened_options: DEFAULT_EVALUATION_YES_NO_OTHER_OPTIONS,
   evaluation_likes_music_options: DEFAULT_EVALUATION_YES_NO_OTHER_OPTIONS,
+  evaluation_key_points_zicht_far_options: DEFAULT_KEY_POINT_ZICHT_FAR_OPTIONS,
+  evaluation_key_points_shiur_options: DEFAULT_KEY_POINT_SHIUR_OPTIONS,
+  evaluation_key_points_style_options: DEFAULT_KEY_POINT_STYLE_OPTIONS,
+  evaluation_key_points_dormitory_options: DEFAULT_EVALUATION_YES_NO_OTHER_OPTIONS,
   evaluation_billing_answers: DEFAULT_EVALUATION_BILLING_ANSWERS,
+  yeshiva_hashkafas: SCHOOL_HASHKAFAS,
+  yeshiva_types: SCHOOL_TYPES,
+  yeshiva_environment_types: ENVIRONMENT_TYPES,
+  placement_statuses: PLACEMENT_STATUSES,
+  billing_service_types: SERVICE_TYPES,
+  billing_statuses: BILLING_STATUSES,
+  payment_methods: PAYMENT_METHODS,
 };
 
 export function uniqueOptions(options) {
