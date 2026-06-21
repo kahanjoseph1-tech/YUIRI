@@ -8,12 +8,33 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Search, GraduationCap, Pencil, MapPin, Phone, Mail, Globe } from "lucide-react";
+import { Plus, Search, GraduationCap, Pencil, MapPin, Phone, Mail, Globe, FileText, ExternalLink } from "lucide-react";
 import StatusBadge from "@/components/StatusBadge";
 import SchoolFormDialog from "@/components/schools/SchoolFormDialog";
 import { SCHOOL_HASHKAFAS, SCHOOL_TYPES } from "@/lib/constants";
+import {
+  DEFAULT_DROPDOWN_OPTIONS,
+  DROPDOWN_OPTIONS_QUERY_KEY,
+  getDropdownOptions,
+  uniqueOptions,
+} from "@/lib/dropdownSettings";
 import { can } from "@/lib/roles";
 import { useRole } from "@/lib/useRole";
+
+function DetailLink({ href, children }) {
+  if (!href) return null;
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-flex items-center gap-1 text-[#1e3a5f] hover:underline break-all"
+    >
+      {children}
+      <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
+    </a>
+  );
+}
 
 export default function Schools() {
   const queryClient = useQueryClient();
@@ -34,6 +55,19 @@ export default function Schools() {
   const { data: placements = [] } = useQuery({
     queryKey: ["placements"], queryFn: () => firebaseClient.entities.Placement.list("-created_date", 1000),
   });
+  const { data: dropdownOptions = DEFAULT_DROPDOWN_OPTIONS } = useQuery({
+    queryKey: DROPDOWN_OPTIONS_QUERY_KEY,
+    queryFn: getDropdownOptions,
+  });
+
+  const hashkafaOptions = useMemo(
+    () => uniqueOptions([...(dropdownOptions.yeshiva_hashkafas || SCHOOL_HASHKAFAS), ...schools.map((s) => s.hashkafa)]),
+    [dropdownOptions.yeshiva_hashkafas, schools]
+  );
+  const typeOptions = useMemo(
+    () => uniqueOptions([...(dropdownOptions.yeshiva_types || SCHOOL_TYPES), ...schools.map((s) => s.type)]),
+    [dropdownOptions.yeshiva_types, schools]
+  );
 
   const createMutation = useMutation({
     mutationFn: (data) => firebaseClient.entities.School.create(data),
@@ -47,7 +81,7 @@ export default function Schools() {
   });
 
   const filtered = useMemo(() => schools.filter((s) => {
-    if (search && !`${s.name} ${s.location || ""}`.toLowerCase().includes(search.toLowerCase())) return false;
+    if (search && !`${s.name} ${s.location || ""} ${s.contact_person || ""} ${s.phone || ""} ${s.email || ""}`.toLowerCase().includes(search.toLowerCase())) return false;
     if (hashkafa !== "all" && s.hashkafa !== hashkafa) return false;
     if (type !== "all" && s.type !== type) return false;
     if (grade && !(s.grade_range || "").toLowerCase().includes(grade.toLowerCase())) return false;
@@ -79,14 +113,14 @@ export default function Schools() {
           <SelectTrigger><SelectValue placeholder="Hashkafa" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Hashkafas</SelectItem>
-            {SCHOOL_HASHKAFAS.map((h) => <SelectItem key={h} value={h}>{h}</SelectItem>)}
+            {hashkafaOptions.map((h) => <SelectItem key={h} value={h}>{h}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={type} onValueChange={setType}>
           <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Types</SelectItem>
-            {SCHOOL_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+            {typeOptions.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
           </SelectContent>
         </Select>
         <Input placeholder="Grade (e.g. 5th)" value={grade} onChange={(e) => setGrade(e.target.value)} />
@@ -108,7 +142,7 @@ export default function Schools() {
               <div className="flex items-start justify-between">
                 <div className="min-w-0">
                   <p className="font-semibold text-gray-900 truncate">{s.name}</p>
-                  <p className="text-xs text-gray-400">{s.type || "—"}{s.location ? ` · ${s.location}` : ""}</p>
+                  <p className="text-xs text-gray-400">{s.type || "-"}{s.location ? ` - ${s.location}` : ""}</p>
                 </div>
                 {canWrite && (
                   <button onClick={(e) => { e.stopPropagation(); setEditSchool(s); }} className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-gray-100">
@@ -141,11 +175,25 @@ export default function Schools() {
                 {viewSchool.environment_type && <p><span className="text-gray-400">Environment:</span> {viewSchool.environment_type}</p>}
                 {viewSchool.address && <p className="flex items-center gap-2"><MapPin className="w-4 h-4 text-gray-400" /> {viewSchool.address}</p>}
                 {viewSchool.phone && <p className="flex items-center gap-2"><Phone className="w-4 h-4 text-gray-400" /> {viewSchool.phone}</p>}
+                {viewSchool.fax && <p><span className="text-gray-400">Fax:</span> {viewSchool.fax}</p>}
                 {viewSchool.email && <p className="flex items-center gap-2"><Mail className="w-4 h-4 text-gray-400" /> {viewSchool.email}</p>}
                 {viewSchool.website && <p className="flex items-center gap-2"><Globe className="w-4 h-4 text-gray-400" /> {viewSchool.website}</p>}
                 {viewSchool.contact_person && <p><span className="text-gray-400">Contact:</span> {viewSchool.contact_person}</p>}
+                {viewSchool.application_url && (
+                  <p className="flex items-start gap-2">
+                    <FileText className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                    <DetailLink href={viewSchool.application_url}>{viewSchool.application_text || "Application"}</DetailLink>
+                  </p>
+                )}
+                {viewSchool.information_url && (
+                  <p className="flex items-start gap-2">
+                    <FileText className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                    <DetailLink href={viewSchool.information_url}>{viewSchool.information_text || "Information"}</DetailLink>
+                  </p>
+                )}
                 {viewSchool.specialties?.length > 0 && <p><span className="text-gray-400">Specialties:</span> {viewSchool.specialties.join(", ")}</p>}
-                {viewSchool.description && <p className="pt-2 border-t border-gray-50">{viewSchool.description}</p>}
+                {viewSchool.description && <p className="pt-2 border-t border-gray-50 whitespace-pre-wrap">{viewSchool.description}</p>}
+                {viewSchool.notes && viewSchool.notes !== viewSchool.description && <p className="pt-2 border-t border-gray-50 whitespace-pre-wrap">{viewSchool.notes}</p>}
               </div>
 
               <div className="pt-4 border-t border-gray-100">
