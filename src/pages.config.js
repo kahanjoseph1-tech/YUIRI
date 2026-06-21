@@ -15,6 +15,7 @@ import OpenCases from './pages/OpenCases';
 import Schools from './pages/Schools';
 import Placements from './pages/Placements';
 import Billing from './pages/Billing';
+import Financials from './pages/Financials';
 import Reports from './pages/Reports';
 import Users from './pages/Users';
 import Settings from './pages/Settings';
@@ -31,6 +32,7 @@ export const PAGES = {
     "Schools": Schools,
     "Placements": Placements,
     "Billing": Billing,
+    "Financials": Financials,
     "Reports": Reports,
     "Users": Users,
     "Settings": Settings,

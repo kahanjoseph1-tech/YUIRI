@@ -51,6 +51,9 @@ const STATUS_TONE = {
   "Partially Paid": "yellow",
   "Paid": "green",
   "Waived": "gray",
+  // Financials
+  "Income": "green",
+  "Expense": "red",
 };
 
 export function toneFor(value) {
