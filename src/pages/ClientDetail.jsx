@@ -17,6 +17,8 @@ import {
   CalendarPlus,
   CheckCircle2,
   Clock,
+  CreditCard,
+  DollarSign,
   FileText,
   GraduationCap,
   ListTodo,
@@ -34,11 +36,16 @@ import Combobox from "@/components/common/Combobox";
 import ClientFormDrawer from "@/components/clients/ClientFormDrawer";
 import AppointmentFormDialog from "@/components/appointments/AppointmentFormDialog";
 import BillingFormDialog from "@/components/billing/BillingFormDialog";
+import RecordPaymentDialog from "@/components/billing/RecordPaymentDialog";
 import SchoolInfoDialog from "@/components/schools/SchoolInfoDialog";
-import { ensureEvaluationBillingForAppointment } from "@/lib/automations";
+import {
+  ensureEvaluationBillingForAppointment,
+  recordFinancialTransactionForBillingPayment,
+  syncFinancialTransactionForBillingPayment,
+} from "@/lib/automations";
 import { can } from "@/lib/roles";
 import { useRole } from "@/lib/useRole";
-import { fmtDate, fmtDateTime, initials, toDate } from "@/lib/format";
+import { fmtCurrency, fmtDate, fmtDateTime, initials, toDate } from "@/lib/format";
 
 const QUESTION_FIELDS = [
   { key: "fartags", label: "פארטאגס" },
@@ -204,6 +211,21 @@ function Stat({ label, value, tone = "blue" }) {
   );
 }
 
+function billingPaidAmount(record) {
+  const amountPaid = Number(record?.amount_paid || 0);
+  if (amountPaid > 0) return amountPaid;
+  return record?.billing_status === "Paid" ? Number(record?.amount || 0) : 0;
+}
+
+function billingBalance(record) {
+  if (record?.billing_status === "Waived") return 0;
+  return Math.max((Number(record?.amount) || 0) - billingPaidAmount(record), 0);
+}
+
+function billingSortDate(record) {
+  return record?.payment_date || record?.paid_date || record?.appointment_date || record?.updated_date || record?.created_date || "";
+}
+
 function EvaluationCard({ evaluation, index, onAddFollowUp }) {
   const answers = QUESTION_FIELDS
     .map((field) => ({ ...field, value: questionnaireAnswer(evaluation, field.key) }))
@@ -295,6 +317,8 @@ export default function ClientDetail() {
   const [editOpen, setEditOpen] = useState(false);
   const [apptOpen, setApptOpen] = useState(false);
   const [billOpen, setBillOpen] = useState(false);
+  const [editBillingRecord, setEditBillingRecord] = useState(null);
+  const [payBillingRecord, setPayBillingRecord] = useState(null);
   const [followFormOpen, setFollowFormOpen] = useState(false);
   const [followForm, setFollowForm] = useState(FOLLOW_UP_EMPTY);
   const [recommendSchoolId, setRecommendSchoolId] = useState("");
@@ -357,9 +381,48 @@ export default function ClientDetail() {
   });
 
   const createBill = useMutation({
-    mutationFn: (data) => firebaseClient.entities.BillingRecord.create(data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["billing"] }); toast.success("Billing record created"); },
+    mutationFn: async (data) => {
+      const record = await firebaseClient.entities.BillingRecord.create(data);
+      await syncFinancialTransactionForBillingPayment(record);
+      return record;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["billing"] });
+      queryClient.invalidateQueries({ queryKey: ["financials"] });
+      toast.success("Billing record created");
+    },
     onError: () => toast.error("Failed to create record"),
+  });
+
+  const updateBill = useMutation({
+    mutationFn: async ({ billingId, data }) => {
+      const {
+        payment_amount_received,
+        payment_event_id,
+        ...billingPatch
+      } = data;
+      const updated = await firebaseClient.entities.BillingRecord.update(billingId, billingPatch);
+
+      if (payment_event_id && Number(payment_amount_received || 0) > 0) {
+        await recordFinancialTransactionForBillingPayment(updated, {
+          amount: Number(payment_amount_received),
+          eventId: payment_event_id,
+          transactionDate: billingPatch.payment_date,
+          paymentMethod: billingPatch.payment_method,
+          notes: billingPatch.payment_note,
+        });
+      } else {
+        await syncFinancialTransactionForBillingPayment(updated);
+      }
+
+      return updated;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["billing"] });
+      queryClient.invalidateQueries({ queryKey: ["financials"] });
+      toast.success("Billing updated");
+    },
+    onError: () => toast.error("Failed to update billing"),
   });
 
   const createFollowUp = useMutation({
@@ -563,7 +626,13 @@ export default function ClientDetail() {
   const myEvals = evaluations
     .filter((record) => record.client_id === id)
     .sort((a, b) => new Date(b.appointment_date || b.created_date) - new Date(a.appointment_date || a.created_date));
-  const myBilling = billing.filter((record) => record.client_id === id);
+  const myBilling = billing
+    .filter((record) => record.client_id === id)
+    .sort((a, b) => new Date(billingSortDate(b) || 0) - new Date(billingSortDate(a) || 0));
+  const totalCharged = myBilling.reduce((sum, record) => sum + (Number(record.amount) || 0), 0);
+  const totalPaid = myBilling.reduce((sum, record) => sum + billingPaidAmount(record), 0);
+  const totalBalance = myBilling.reduce((sum, record) => sum + billingBalance(record), 0);
+  const lastPayment = myBilling.find((record) => billingPaidAmount(record) > 0 && (record.payment_date || record.paid_date));
   const myPlacements = placements
     .filter((record) => record.client_id === id)
     .sort((a, b) => new Date(b.closed_date || b.updated_date || b.created_date || 0) - new Date(a.closed_date || a.updated_date || a.created_date || 0));
@@ -788,6 +857,89 @@ export default function ClientDetail() {
           </div>
         </Section>
       </div>
+
+      <Section
+        title="Billing"
+        action={canBill && (
+          <Button size="sm" className="gap-2 bg-[#1e3a5f] hover:bg-[#1e3a5f]/90" onClick={() => setBillOpen(true)}>
+            <Plus className="w-4 h-4" /> Add Charge
+          </Button>
+        )}
+      >
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <Stat label="Charged" value={fmtCurrency(totalCharged)} tone="gray" />
+          <Stat label="Paid" value={fmtCurrency(totalPaid)} tone={totalPaid > 0 ? "green" : "gray"} />
+          <Stat label="Balance" value={fmtCurrency(totalBalance)} tone={totalBalance > 0 ? "amber" : "green"} />
+          <Stat label="Last Payment" value={lastPayment ? fmtDate(lastPayment.payment_date || lastPayment.paid_date) : "-"} tone="blue" />
+        </div>
+
+        {myBilling.length === 0 ? (
+          <div className="mt-5 rounded-xl border border-dashed border-gray-200 p-8 text-center">
+            <DollarSign className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+            <p className="text-sm text-gray-400">No billing records yet.</p>
+          </div>
+        ) : (
+          <div className="mt-5 divide-y divide-gray-100 rounded-xl border border-gray-100">
+            {myBilling.map((record) => {
+              const paid = billingPaidAmount(record);
+              const balance = billingBalance(record);
+              const paymentDate = record.payment_date || record.paid_date;
+              const canRecordPayment = canBill && balance > 0 && record.billing_status !== "Waived";
+              return (
+                <div key={record.id} className="p-4">
+                  <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-semibold text-gray-900">{record.service_type || "Charge"}</p>
+                        <StatusBadge status={record.billing_status} />
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {record.invoice_number ? `Invoice ${record.invoice_number}` : "No invoice number"}
+                        {record.appointment_date ? ` - ${fmtDate(record.appointment_date)}` : ""}
+                      </p>
+                      {(record.payment_method || record.payment_note || paymentDate) && (
+                        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                          {paymentDate && <span>Paid {fmtDateTime(paymentDate)}</span>}
+                          {record.payment_method && <span className="inline-flex items-center gap-1"><CreditCard className="w-3 h-3" /> {record.payment_method}</span>}
+                          {record.payment_note && <span>{record.payment_note}</span>}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 text-right lg:min-w-72">
+                      <div>
+                        <p className="text-[11px] text-gray-400">Charge</p>
+                        <p className="font-semibold text-gray-900">{fmtCurrency(record.amount)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] text-gray-400">Paid</p>
+                        <p className="font-semibold text-emerald-700">{fmtCurrency(paid)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] text-gray-400">Balance</p>
+                        <p className={`font-semibold ${balance > 0 ? "text-amber-700" : "text-emerald-700"}`}>{fmtCurrency(balance)}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {canBill && (
+                    <div className="mt-3 flex flex-wrap justify-end gap-2">
+                      <Button type="button" size="sm" variant="outline" onClick={() => setEditBillingRecord(record)}>
+                        Edit
+                      </Button>
+                      {canRecordPayment && (
+                        <Button type="button" size="sm" className="gap-1 bg-emerald-600 hover:bg-emerald-700" onClick={() => setPayBillingRecord(record)}>
+                          <DollarSign className="w-3 h-3" /> Record Payment
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Section>
 
       <Section title="Placement">
         <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-5">
@@ -1128,8 +1280,21 @@ export default function ClientDetail() {
       />
       <BillingFormDialog
         open={billOpen} onOpenChange={setBillOpen}
-        clients={clients} record={{ client_id: id, client_name: name, service_type: "Yeshiva Placement", billing_status: "Not Billed", amount: "" }}
+        clients={clients} record={{ client_id: id, client_name: name, service_type: "Evaluation", billing_status: "Invoice Sent", amount: "" }}
         onSave={(data) => createBill.mutateAsync(data)}
+      />
+      <BillingFormDialog
+        open={!!editBillingRecord}
+        onOpenChange={() => setEditBillingRecord(null)}
+        clients={clients}
+        record={editBillingRecord}
+        onSave={(data) => updateBill.mutateAsync({ billingId: editBillingRecord.id, data })}
+      />
+      <RecordPaymentDialog
+        open={!!payBillingRecord}
+        onOpenChange={() => setPayBillingRecord(null)}
+        record={payBillingRecord}
+        onSave={(data) => updateBill.mutateAsync({ billingId: payBillingRecord.id, data })}
       />
       <SchoolInfoDialog
         open={schoolInfoOpen}
