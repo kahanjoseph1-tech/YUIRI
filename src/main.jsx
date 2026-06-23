@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client'
 import App from '@/App.jsx'
 import '@/index.css'
 
-const buildVersion = 'financials-2026-06-21-1'
+const buildVersion = 'client-yeshiva-link-drafts-2026-06-23-1'
 
 window.__YUIRI_BUILD_VERSION__ = buildVersion
 

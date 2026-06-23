@@ -1,9 +1,12 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { FileText, GraduationCap, Mail, MapPin, Phone } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { firebaseClient } from "@/api/firebaseClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import StatusBadge from "@/components/StatusBadge";
+import SchoolInfoDialog from "@/components/schools/SchoolInfoDialog";
 import { createPageUrl } from "@/utils";
 
 function phoneLabel(phone) {
@@ -18,19 +21,48 @@ function clientPhoneRows(client) {
   return client?.parent_phone ? [{ tag: "Phone", number: client.parent_phone }] : [];
 }
 
-function Info({ icon: Icon, label, value }) {
+function Info({ icon: Icon, label, value, onClick }) {
   if (!value) return null;
-  return (
-    <div className="flex items-center gap-2 text-sm text-gray-600">
+  const className = `flex items-center gap-2 text-sm text-gray-600 ${
+    onClick ? "w-full rounded-md px-1 py-1 text-left hover:bg-blue-50 hover:text-blue-900" : ""
+  }`;
+  const content = (
+    <>
       <Icon className="h-4 w-4 text-gray-400" />
       <span className="text-gray-400">{label}:</span>
       <span className="min-w-0 break-words">{value}</span>
+    </>
+  );
+  if (onClick) {
+    return (
+      <button type="button" className={className} onClick={onClick}>
+        {content}
+      </button>
+    );
+  }
+  return (
+    <div className={className}>
+      {content}
     </div>
   );
 }
 
 export default function ClientQuickProfileDialog({ client, open, onOpenChange }) {
+  const [schoolInfoOpen, setSchoolInfoOpen] = useState(false);
+  const { data: schools = [] } = useQuery({
+    queryKey: ["schools"],
+    queryFn: () => firebaseClient.entities.School.list("-created_date", 1000),
+    enabled: open && !!client,
+  });
+  const currentSchool = useMemo(() => {
+    if (!client) return null;
+    return schools.find((school) => school.id === client.current_school_id) ||
+      schools.find((school) => school.name && school.name === client.current_school) ||
+      null;
+  }, [client, schools]);
+
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
@@ -72,7 +104,7 @@ export default function ClientQuickProfileDialog({ client, open, onOpenChange })
               ))}
               <Info icon={Mail} label="Email" value={client.parent_email} />
               <Info icon={MapPin} label="City" value={client.city} />
-              <Info icon={GraduationCap} label="לערנט בישיבה" value={client.current_school} />
+              <Info icon={GraduationCap} label="לערנט בישיבה" value={client.current_school} onClick={currentSchool ? () => setSchoolInfoOpen(true) : undefined} />
               <Info icon={GraduationCap} label="שיעור" value={client.shiur} />
               <Info icon={FileText} label="סיבה" value={client.reason} />
             </div>
@@ -92,5 +124,7 @@ export default function ClientQuickProfileDialog({ client, open, onOpenChange })
         )}
       </DialogContent>
     </Dialog>
+    <SchoolInfoDialog open={schoolInfoOpen} onOpenChange={setSchoolInfoOpen} school={currentSchool} />
+    </>
   );
 }

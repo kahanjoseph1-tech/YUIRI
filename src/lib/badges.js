@@ -12,6 +12,7 @@ export const TONE_CLASSES = {
 
 const STATUS_TONE = {
   // Client
+  "Draft": "gray",
   "New Client": "blue",
   "Intake Scheduled": "yellow",
   "Evaluating": "blue",

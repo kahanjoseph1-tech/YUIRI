@@ -1,8 +1,17 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { FileText, ImageIcon, Plus, Trash2, UploadCloud } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { Eye, FileText, GraduationCap, ImageIcon, Plus, Trash2, UploadCloud } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { firebaseClient } from "@/api/firebaseClient";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,12 +25,15 @@ import {
   uniqueOptions,
 } from "@/lib/dropdownSettings";
 import { storage } from "@/lib/firebase";
+import Combobox from "@/components/common/Combobox";
+import SchoolFormDialog from "@/components/schools/SchoolFormDialog";
+import SchoolInfoDialog from "@/components/schools/SchoolInfoDialog";
 
 const EMPTY = {
   boy_first_name: "", boy_last_name: "", age: "",
   father_name: "", parent_phone: "", parent_email: "",
   profile_photo: null, files: [],
-  city: "", current_school: "", shiur: "", reason: "", caller_source: "", caller_name: "", referral_source: "",
+  city: "", current_school_id: "", current_school: "", shiur: "", reason: "", caller_source: "", caller_name: "", referral_source: "",
   responsible_person: "", responsible_name: "",
   family_expectations: "", notes: "", status: "New Client",
   assigned_evaluator_id: "", special_needs: [],
@@ -42,6 +54,25 @@ function formatFileSize(bytes) {
   if (size < 1024) return `${size} B`;
   if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function schoolOptionLabel(school) {
+  return [school?.name, school?.location, school?.hashkafa].filter(Boolean).join(" - ");
+}
+
+function fileToken(file) {
+  if (!file) return "";
+  return `${file.name || ""}:${file.size || 0}:${file.type || ""}`;
+}
+
+function formSnapshot({ form, phoneRows, needsText, pendingPhoto, pendingFiles }) {
+  return JSON.stringify({
+    form,
+    phoneRows,
+    needsText,
+    pendingPhoto: fileToken(pendingPhoto),
+    pendingFiles: (pendingFiles || []).map(fileToken),
+  });
 }
 
 async function uploadClientFile(file, clientKey, folder) {
@@ -85,13 +116,19 @@ function Field({ label, children, full }) {
 }
 
 export default function ClientFormDrawer({ open, onOpenChange, client, onSave }) {
+  const queryClient = useQueryClient();
   const uploadGroupRef = useRef(makeId());
+  const initialSnapshotRef = useRef("");
+  const closeBypassRef = useRef(false);
   const [form, setForm] = useState(EMPTY);
   const [phoneRows, setPhoneRows] = useState([emptyPhoneRow()]);
   const [needsText, setNeedsText] = useState("");
   const [pendingPhoto, setPendingPhoto] = useState(null);
   const [pendingFiles, setPendingFiles] = useState([]);
   const [draggingFiles, setDraggingFiles] = useState(false);
+  const [addSchoolOpen, setAddSchoolOpen] = useState(false);
+  const [schoolInfoOpen, setSchoolInfoOpen] = useState(false);
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const { data: dropdownOptions = DEFAULT_DROPDOWN_OPTIONS } = useQuery({
@@ -99,24 +136,60 @@ export default function ClientFormDrawer({ open, onOpenChange, client, onSave })
     queryFn: getDropdownOptions,
   });
 
+  const { data: schools = [] } = useQuery({
+    queryKey: ["schools"],
+    queryFn: () => firebaseClient.entities.School.list("-created_date", 1000),
+  });
+
+  const createSchoolMutation = useMutation({
+    mutationFn: (data) => firebaseClient.entities.School.create(data),
+    onSuccess: (school) => {
+      queryClient.setQueryData(["schools"], (current = []) =>
+        current.some((item) => item.id === school.id) ? current : [school, ...current]
+      );
+      queryClient.invalidateQueries({ queryKey: ["schools"] });
+      setForm((current) => ({
+        ...current,
+        current_school_id: school.id,
+        current_school: school.name || "",
+      }));
+      toast.success("Yeshiva added");
+    },
+    onError: () => toast.error("Failed to add yeshiva"),
+  });
+
   useEffect(() => {
     if (open) {
+      closeBypassRef.current = false;
       uploadGroupRef.current = client?.id || makeId();
       const nextForm = client
         ? {
             ...EMPTY,
             ...client,
             status: client.status || "New Client",
+            current_school_id: client.current_school_id || "",
             caller_source: client.caller_source || client.referral_source || "",
             responsible_person: client.responsible_person || "",
           }
         : EMPTY;
+      const nextPhoneRows = phoneRowsFromClient(client);
+      const nextNeedsText = (client?.special_needs || []).join(", ");
       setForm(nextForm);
-      setPhoneRows(phoneRowsFromClient(client));
-      setNeedsText((client?.special_needs || []).join(", "));
+      setPhoneRows(nextPhoneRows);
+      setNeedsText(nextNeedsText);
       setPendingPhoto(null);
       setPendingFiles([]);
       setDraggingFiles(false);
+      setAddSchoolOpen(false);
+      setSchoolInfoOpen(false);
+      setConfirmCloseOpen(false);
+      initialSnapshotRef.current = formSnapshot({
+        form: nextForm,
+        phoneRows: nextPhoneRows,
+        needsText: nextNeedsText,
+        pendingPhoto: null,
+        pendingFiles: [],
+      });
     }
   }, [open, client]);
 
@@ -152,7 +225,51 @@ export default function ClientFormDrawer({ open, onOpenChange, client, onSave })
     [dropdownOptions.shiur_options, form.shiur]
   );
 
+  const schoolOptions = useMemo(
+    () => schools.map((school) => ({ value: school.id, label: schoolOptionLabel(school) || school.name || "Yeshiva" })),
+    [schools]
+  );
+
+  const selectedSchool = useMemo(() => {
+    return schools.find((school) => school.id === form.current_school_id) ||
+      schools.find((school) => school.name && school.name === form.current_school) ||
+      null;
+  }, [schools, form.current_school_id, form.current_school]);
+
+  const currentSnapshot = formSnapshot({ form, phoneRows, needsText, pendingPhoto, pendingFiles });
+  const hasUnsavedChanges = open && currentSnapshot !== initialSnapshotRef.current;
+  const canSaveFinal = Boolean(form.boy_first_name && form.boy_last_name);
+  const hasAnyDraftContent = hasUnsavedChanges || Boolean(form.boy_first_name || form.boy_last_name || form.father_name || form.parent_email || form.current_school);
+
   const update = (field, value) => setForm((p) => ({ ...p, [field]: value }));
+
+  const closeWithoutPrompt = () => {
+    closeBypassRef.current = true;
+    setConfirmCloseOpen(false);
+    onOpenChange(false);
+  };
+
+  const handleSheetOpenChange = (nextOpen) => {
+    if (nextOpen) {
+      onOpenChange(true);
+      return;
+    }
+    if (closeBypassRef.current || !hasUnsavedChanges) {
+      closeBypassRef.current = false;
+      onOpenChange(false);
+      return;
+    }
+    setConfirmCloseOpen(true);
+  };
+
+  const selectCurrentSchool = (schoolId) => {
+    const school = schools.find((item) => item.id === schoolId);
+    setForm((current) => ({
+      ...current,
+      current_school_id: school?.id || "",
+      current_school: school?.name || "",
+    }));
+  };
 
   const addPendingFiles = (fileList) => {
     const files = Array.from(fileList || []);
@@ -184,7 +301,7 @@ export default function ClientFormDrawer({ open, onOpenChange, client, onSave })
     });
   };
 
-  const handleSave = async () => {
+  const handleSave = async ({ draft = false } = {}) => {
     setSaving(true);
     try {
       const cleanedPhones = phoneRows
@@ -214,12 +331,14 @@ export default function ClientFormDrawer({ open, onOpenChange, client, onSave })
 
       await onSave({
         ...form,
-        status: form.status || "New Client",
+        status: draft ? "Draft" : (form.status || "New Client"),
         age: form.age ? Number(form.age) : undefined,
         phone_numbers: cleanedPhones,
         profile_photo: uploadedPhoto,
         files: [...(Array.isArray(form.files) ? form.files : []), ...uploadedFiles],
         parent_phone: cleanedPhones[0]?.number || "",
+        current_school_id: selectedSchool?.id || form.current_school_id || "",
+        current_school: selectedSchool?.name || form.current_school || "",
         caller_source: callerSource,
         caller_name: String(form.caller_name || "").trim(),
         referral_source: callerSource,
@@ -228,7 +347,7 @@ export default function ClientFormDrawer({ open, onOpenChange, client, onSave })
         assigned_evaluator_id: form.assigned_evaluator_id || "",
         special_needs: needsText ? needsText.split(",").map((s) => s.trim()).filter(Boolean) : [],
       });
-      onOpenChange(false);
+      closeWithoutPrompt();
     } catch (error) {
       console.error("Client save failed:", error);
       toast.error(error?.message || "Failed to save client");
@@ -238,7 +357,8 @@ export default function ClientFormDrawer({ open, onOpenChange, client, onSave })
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <>
+    <Sheet open={open} onOpenChange={handleSheetOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
         <SheetHeader>
           <SheetTitle>{client ? "Edit Client" : "Add Client"}</SheetTitle>
@@ -364,7 +484,39 @@ export default function ClientFormDrawer({ open, onOpenChange, client, onSave })
             <Input type="email" value={form.parent_email} onChange={(e) => update("parent_email", e.target.value)} />
           </Field>
           <Field label="לערנט בישיבה">
-            <Input value={form.current_school} onChange={(e) => update("current_school", e.target.value)} />
+            <div className="space-y-2">
+              <Combobox
+                options={schoolOptions}
+                value={selectedSchool?.id || form.current_school_id || ""}
+                onChange={selectCurrentSchool}
+                placeholder="Search yeshiva..."
+                emptyText="No yeshivas found."
+              />
+              {selectedSchool ? (
+                <button
+                  type="button"
+                  onClick={() => setSchoolInfoOpen(true)}
+                  className="flex w-full items-start gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-left hover:bg-blue-100/70"
+                >
+                  <GraduationCap className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-blue-900">{selectedSchool.name}</span>
+                    <span className="block truncate text-xs text-blue-700/70">
+                      {[selectedSchool.location, selectedSchool.hashkafa].filter(Boolean).join(" - ") || "View yeshiva info"}
+                    </span>
+                  </span>
+                  <Eye className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
+                </button>
+              ) : form.current_school ? (
+                <div className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  Current text: {form.current_school}. Add it to the directory to link full info.
+                </div>
+              ) : null}
+              <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => setAddSchoolOpen(true)}>
+                <Plus className="h-4 w-4" />
+                Add Yeshiva
+              </Button>
+            </div>
           </Field>
           <Field label="שיעור">
             <Select
@@ -501,11 +653,19 @@ export default function ClientFormDrawer({ open, onOpenChange, client, onSave })
           </Field>
         </div>
 
-        <SheetFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+        <SheetFooter className="gap-2">
+          <Button variant="outline" onClick={() => handleSheetOpenChange(false)}>Cancel</Button>
           <Button
-            onClick={handleSave}
-            disabled={saving || !form.boy_first_name || !form.boy_last_name}
+            type="button"
+            variant="outline"
+            onClick={() => handleSave({ draft: true })}
+            disabled={saving || !hasAnyDraftContent}
+          >
+            {saving ? "Saving..." : "Save Draft"}
+          </Button>
+          <Button
+            onClick={() => handleSave()}
+            disabled={saving || !canSaveFinal}
             className="bg-[#1e3a5f] hover:bg-[#1e3a5f]/90"
           >
             {saving ? "Saving..." : client ? "Update Client" : "Add Client"}
@@ -513,5 +673,41 @@ export default function ClientFormDrawer({ open, onOpenChange, client, onSave })
         </SheetFooter>
       </SheetContent>
     </Sheet>
+
+    <SchoolFormDialog
+      open={addSchoolOpen}
+      onOpenChange={setAddSchoolOpen}
+      onSave={(data) => createSchoolMutation.mutateAsync(data)}
+    />
+    <SchoolInfoDialog
+      open={schoolInfoOpen}
+      onOpenChange={setSchoolInfoOpen}
+      school={selectedSchool}
+    />
+    <AlertDialog open={confirmCloseOpen} onOpenChange={setConfirmCloseOpen}>
+      <AlertDialogContent className="z-[80]">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Save this client?</AlertDialogTitle>
+          <AlertDialogDescription>
+            You have unsaved information in this client form. Save it, save it as a draft, or discard it.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter className="gap-2">
+          <Button type="button" variant="outline" onClick={() => setConfirmCloseOpen(false)}>
+            Keep Editing
+          </Button>
+          <Button type="button" variant="ghost" className="text-red-600 hover:text-red-700" onClick={closeWithoutPrompt}>
+            Discard
+          </Button>
+          <Button type="button" variant="outline" onClick={() => handleSave({ draft: true })} disabled={saving || !hasAnyDraftContent}>
+            Save Draft
+          </Button>
+          <Button type="button" onClick={() => handleSave()} disabled={saving || !canSaveFinal} className="bg-[#1e3a5f] hover:bg-[#1e3a5f]/90">
+            Save
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

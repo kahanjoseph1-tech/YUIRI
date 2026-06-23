@@ -7,6 +7,7 @@ export const GRADE_LEVELS = [
 
 // ---- Client ----
 export const CLIENT_STATUSES = [
+  "Draft",
   "New Client",
   "Intake Scheduled",
   "Evaluating",

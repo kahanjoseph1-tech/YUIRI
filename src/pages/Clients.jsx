@@ -55,7 +55,10 @@ export default function Clients() {
 
   const createMutation = useMutation({
     mutationFn: (data) => firebaseClient.entities.Client.create(data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["clients"] }); toast.success("Client added"); },
+    onSuccess: (record) => {
+      queryClient.invalidateQueries({ queryKey: ["clients"] });
+      toast.success(record?.status === "Draft" ? "Draft saved" : "Client added");
+    },
     onError: (error) => {
       console.error("Failed to add client:", error);
       toast.error(error?.message || "Failed to add client");
@@ -63,7 +66,10 @@ export default function Clients() {
   });
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => firebaseClient.entities.Client.update(id, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["clients"] }); toast.success("Client updated"); },
+    onSuccess: (record) => {
+      queryClient.invalidateQueries({ queryKey: ["clients"] });
+      toast.success(record?.status === "Draft" ? "Draft saved" : "Client updated");
+    },
     onError: (error) => {
       console.error("Failed to update client:", error);
       toast.error(error?.message || "Failed to update client");

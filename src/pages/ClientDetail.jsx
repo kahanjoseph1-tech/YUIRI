@@ -34,6 +34,7 @@ import Combobox from "@/components/common/Combobox";
 import ClientFormDrawer from "@/components/clients/ClientFormDrawer";
 import AppointmentFormDialog from "@/components/appointments/AppointmentFormDialog";
 import BillingFormDialog from "@/components/billing/BillingFormDialog";
+import SchoolInfoDialog from "@/components/schools/SchoolInfoDialog";
 import { ensureEvaluationBillingForAppointment } from "@/lib/automations";
 import { can } from "@/lib/roles";
 import { useRole } from "@/lib/useRole";
@@ -160,15 +161,30 @@ function Section({ title, action, children }) {
   );
 }
 
-function InfoItem({ icon: Icon, label, value }) {
+function InfoItem({ icon: Icon, label, value, onClick }) {
   if (!value) return null;
-  return (
-    <div className="flex items-start gap-3 rounded-lg border border-gray-100 px-3 py-3">
+  const className = `flex items-start gap-3 rounded-lg border border-gray-100 px-3 py-3 ${
+    onClick ? "text-left hover:border-blue-200 hover:bg-blue-50/60" : ""
+  }`;
+  const content = (
+    <>
       <Icon className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
       <div className="min-w-0">
         <p className="text-xs text-gray-400">{label}</p>
         <p className="text-sm font-medium text-gray-800 break-words">{value}</p>
       </div>
+    </>
+  );
+  if (onClick) {
+    return (
+      <button type="button" className={className} onClick={onClick}>
+        {content}
+      </button>
+    );
+  }
+  return (
+    <div className={className}>
+      {content}
     </div>
   );
 }
@@ -283,6 +299,7 @@ export default function ClientDetail() {
   const [followForm, setFollowForm] = useState(FOLLOW_UP_EMPTY);
   const [recommendSchoolId, setRecommendSchoolId] = useState("");
   const [finalSchoolId, setFinalSchoolId] = useState("");
+  const [schoolInfoOpen, setSchoolInfoOpen] = useState(false);
 
   const { data: clients = [], isLoading } = useQuery({
     queryKey: ["clients"], queryFn: () => firebaseClient.entities.Client.list("-created_date", 1000),
@@ -310,10 +327,18 @@ export default function ClientDetail() {
   });
 
   const client = clients.find((record) => record.id === id);
+  const currentSchool = client
+    ? schools.find((school) => school.id === client.current_school_id) ||
+      schools.find((school) => school.name && school.name === client.current_school) ||
+      null
+    : null;
 
   const updateMutation = useMutation({
     mutationFn: ({ data }) => firebaseClient.entities.Client.update(id, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["clients"] }); toast.success("Client updated"); },
+    onSuccess: (record) => {
+      queryClient.invalidateQueries({ queryKey: ["clients"] });
+      toast.success(record?.status === "Draft" ? "Draft saved" : "Client updated");
+    },
     onError: () => toast.error("Update failed"),
   });
 
@@ -700,7 +725,12 @@ export default function ClientDetail() {
             ))}
             <InfoItem icon={Mail} label="Email address" value={client.parent_email} />
             <InfoItem icon={MapPin} label="City" value={client.city} />
-            <InfoItem icon={GraduationCap} label="לערנט בישיבה" value={client.current_school} />
+            <InfoItem
+              icon={GraduationCap}
+              label="לערנט בישיבה"
+              value={client.current_school}
+              onClick={currentSchool ? () => setSchoolInfoOpen(true) : undefined}
+            />
             <InfoItem icon={GraduationCap} label="שיעור" value={client.shiur} />
             <InfoItem icon={UserRound} label="טאטע'ס נאמען" value={client.father_name} />
             <InfoItem icon={UserRound} label="Mother" value={client.mother_name} />
@@ -1100,6 +1130,11 @@ export default function ClientDetail() {
         open={billOpen} onOpenChange={setBillOpen}
         clients={clients} record={{ client_id: id, client_name: name, service_type: "Yeshiva Placement", billing_status: "Not Billed", amount: "" }}
         onSave={(data) => createBill.mutateAsync(data)}
+      />
+      <SchoolInfoDialog
+        open={schoolInfoOpen}
+        onOpenChange={setSchoolInfoOpen}
+        school={currentSchool}
       />
     </div>
   );
