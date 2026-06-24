@@ -38,6 +38,7 @@ import AppointmentFormDialog from "@/components/appointments/AppointmentFormDial
 import BillingFormDialog from "@/components/billing/BillingFormDialog";
 import InvoiceDialog from "@/components/billing/InvoiceDialog";
 import RecordPaymentDialog from "@/components/billing/RecordPaymentDialog";
+import ApplicationLinksEmailDialog from "@/components/placements/ApplicationLinksEmailDialog";
 import SchoolInfoDialog from "@/components/schools/SchoolInfoDialog";
 import {
   ensureEvaluationBillingForAppointment,
@@ -326,6 +327,7 @@ export default function ClientDetail() {
   const [followForm, setFollowForm] = useState(FOLLOW_UP_EMPTY);
   const [recommendSchoolId, setRecommendSchoolId] = useState("");
   const [finalSchoolId, setFinalSchoolId] = useState("");
+  const [applicationEmailOpen, setApplicationEmailOpen] = useState(false);
   const [schoolInfoOpen, setSchoolInfoOpen] = useState(false);
 
   const { data: clients = [], isLoading } = useQuery({
@@ -967,9 +969,22 @@ export default function ClientDetail() {
       <Section title="Placement">
         <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-5">
           <div className="rounded-xl border border-gray-100 p-4 space-y-4">
-            <div>
-              <h3 className="font-semibold text-gray-900">First recommendations</h3>
-              <p className="text-xs text-gray-400 mt-1">Search the yeshiva list and add as many recommendations as needed.</p>
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+              <div>
+                <h3 className="font-semibold text-gray-900">First recommendations</h3>
+                <p className="text-xs text-gray-400 mt-1">Search the yeshiva list and add as many recommendations as needed.</p>
+              </div>
+              {canPlace && recommendationPlacements.length > 0 && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="gap-2"
+                  onClick={() => setApplicationEmailOpen(true)}
+                >
+                  <Mail className="w-4 h-4" /> Send Applications
+                </Button>
+              )}
             </div>
 
             {canPlace && (
@@ -1324,6 +1339,13 @@ export default function ClientDetail() {
         onOpenChange={() => setInvoiceBillingRecord(null)}
         record={invoiceBillingRecord}
         client={client}
+      />
+      <ApplicationLinksEmailDialog
+        open={applicationEmailOpen}
+        onOpenChange={setApplicationEmailOpen}
+        client={client}
+        placements={recommendationPlacements}
+        schools={schools}
       />
       <SchoolInfoDialog
         open={schoolInfoOpen}

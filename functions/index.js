@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase-admin/app";
-import { FieldValue, getFirestore } from "firebase-admin/firestore";
+import { getFirestore } from "firebase-admin/firestore";
 import { defineSecret } from "firebase-functions/params";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 
@@ -65,6 +65,55 @@ function stripDataUri(value) {
   return cleanString(value).replace(/^data:application\/pdf;base64,/i, "");
 }
 
+function senderDisplayName() {
+  return "\u05d9\u05d0\u05d9\u05e8\u05d5";
+}
+
+function valueLine(label, value) {
+  const text = cleanString(value);
+  return text ? `${label}: ${text}` : "";
+}
+
+function linkHtml(label, href) {
+  const cleanHref = cleanString(href);
+  if (!cleanHref) return "";
+  return `<p style="margin:6px 0"><strong>${escapeHtml(label)}:</strong> <a href="${escapeHtml(cleanHref)}">${escapeHtml(cleanHref)}</a></p>`;
+}
+
+function schoolTextBlock(school) {
+  return [
+    cleanString(school.name, "Yeshiva"),
+    valueLine("Location", school.location || school.address),
+    valueLine("Phone", school.phone),
+    valueLine("Email", school.email),
+    valueLine("Website", school.website),
+    valueLine(school.application_text || "Application", school.application_url),
+    valueLine(school.information_text || "Information", school.information_url),
+    valueLine("Contact", school.contact_person),
+    valueLine("Notes", school.description || school.notes),
+  ].filter(Boolean).join("\r\n");
+}
+
+function schoolHtmlBlock(school) {
+  const details = [
+    school.location || school.address,
+    school.phone,
+    school.email,
+    school.website,
+    school.contact_person ? `Contact: ${school.contact_person}` : "",
+  ].filter(Boolean);
+
+  return `
+    <div style="border:1px solid #e5e7eb;border-radius:12px;padding:14px;margin:14px 0;background:#ffffff">
+      <h3 style="margin:0 0 8px;font-size:17px;color:#111827">${escapeHtml(school.name || "Yeshiva")}</h3>
+      ${details.length ? `<p style="margin:0 0 8px;color:#4b5563">${details.map(escapeHtml).join(" &middot; ")}</p>` : ""}
+      ${linkHtml(school.application_text || "Application", school.application_url)}
+      ${linkHtml(school.information_text || "Information", school.information_url)}
+      ${school.description || school.notes ? `<p style="margin:10px 0 0;color:#4b5563;white-space:pre-wrap">${escapeHtml(school.description || school.notes)}</p>` : ""}
+    </div>
+  `.trim();
+}
+
 async function requireApprovedUser(uid) {
   if (!uid) throw new HttpsError("unauthenticated", "Sign in before sending invoice email.");
 
@@ -126,7 +175,7 @@ async function sendGmailMessage(rawMessage) {
 }
 
 function buildInvoiceMessage({ toEmail, senderEmail, fatherName, boyName, serviceType, invoiceNumber, attachmentBase64, attachmentFileName }) {
-  const fromName = "יאירו";
+  const fromName = senderDisplayName();
   const subject = `Yuiri invoice${invoiceNumber ? ` ${invoiceNumber}` : ""}`;
   const greetingName = fatherName || boyName || "there";
   const service = serviceType || "Evaluation";
@@ -185,6 +234,63 @@ function buildInvoiceMessage({ toEmail, senderEmail, fatherName, boyName, servic
     wrapBase64(attachmentBase64),
     "",
     `--${mixedBoundary}--`,
+    "",
+  ].join("\r\n");
+}
+
+function buildApplicationLinksMessage({ toEmail, senderEmail, fatherName, boyName, schools }) {
+  const fromName = senderDisplayName();
+  const greetingName = fatherName || boyName || "there";
+  const subject = `Yeshiva application links${boyName ? ` for ${boyName}` : ""}`;
+  const boundary = `yuiri_application_${Date.now()}`;
+
+  const textBody = [
+    `Dear ${greetingName},`,
+    "",
+    `Please see below the yeshiva information and application links for ${boyName || "your son"}.`,
+    "",
+    ...schools.flatMap((school, index) => [
+      `${index + 1}. ${schoolTextBlock(school)}`,
+      "",
+    ]),
+    "Please let me know if you have any questions or require any further information.",
+    "",
+    "Best regards,",
+    fromName,
+  ].join("\r\n");
+
+  const htmlBody = `
+    <div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.6;color:#111827;background:#f8fafc;padding:18px">
+      <div style="max-width:680px;margin:0 auto;background:#ffffff;border-radius:16px;padding:22px;border:1px solid #e5e7eb">
+        <p>Dear <span dir="auto">${escapeHtml(greetingName)}</span>,</p>
+        <p>Please see below the yeshiva information and application links for <strong dir="auto">${escapeHtml(boyName || "your son")}</strong>.</p>
+        ${schools.map(schoolHtmlBlock).join("")}
+        <p>Please let me know if you have any questions or require any further information.</p>
+        <p>Best regards,<br><span dir="rtl">${escapeHtml(fromName)}</span></p>
+      </div>
+    </div>
+  `.trim();
+
+  return [
+    `From: ${encodeHeader(fromName)} <${senderEmail}>`,
+    `To: ${toEmail}`,
+    `Subject: ${encodeHeader(subject)}`,
+    "MIME-Version: 1.0",
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    "",
+    `--${boundary}`,
+    "Content-Type: text/plain; charset=UTF-8",
+    "Content-Transfer-Encoding: 8bit",
+    "",
+    textBody,
+    "",
+    `--${boundary}`,
+    "Content-Type: text/html; charset=UTF-8",
+    "Content-Transfer-Encoding: 8bit",
+    "",
+    htmlBody,
+    "",
+    `--${boundary}--`,
     "",
   ].join("\r\n");
 }
@@ -261,6 +367,84 @@ export const sendInvoiceEmail = onCall(
         { merge: true },
       );
     }
+
+    return {
+      sent: true,
+      toEmail,
+      messageId: gmailResult.id || "",
+      threadId: gmailResult.threadId || "",
+      sentAt,
+    };
+  },
+);
+
+export const sendApplicationLinksEmail = onCall(
+  {
+    region: "us-central1",
+    secrets: [GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, GMAIL_SENDER_EMAIL],
+  },
+  async (request) => {
+    const authUser = await requireApprovedUser(request.auth?.uid);
+    const data = request.data || {};
+    const toEmail = validateEmail(data.toEmail);
+    const client = await readOptionalDocument("clients", data.clientId);
+    if (!client) throw new HttpsError("not-found", "Client was not found.");
+
+    const schoolIds = Array.isArray(data.schoolIds) ? data.schoolIds.map(cleanString).filter(Boolean) : [];
+    if (schoolIds.length === 0) {
+      throw new HttpsError("invalid-argument", "Choose at least one yeshiva to email.");
+    }
+
+    const schoolSnapshots = await Promise.all(schoolIds.map((schoolId) => db.collection("schools").doc(schoolId).get()));
+    const schools = schoolSnapshots
+      .filter((snapshot) => snapshot.exists)
+      .map((snapshot) => ({ id: snapshot.id, ...snapshot.data() }));
+
+    if (schools.length === 0) {
+      throw new HttpsError("invalid-argument", "No yeshivas were found for this email.");
+    }
+
+    const senderEmail = validateEmail(GMAIL_SENDER_EMAIL.value());
+    const boyName = cleanString(data.clientName || `${client.boy_first_name || ""} ${client.boy_last_name || ""}`, "Client");
+    const fatherName = cleanString(data.fatherName || client.father_name);
+    const rawMessage = buildApplicationLinksMessage({
+      toEmail,
+      senderEmail,
+      fatherName,
+      boyName,
+      schools,
+    });
+
+    const gmailResult = await sendGmailMessage(rawMessage);
+    const sentAt = new Date().toISOString();
+    const log = {
+      type: "application_links",
+      provider: "gmail",
+      to_email: toEmail,
+      from_email: senderEmail,
+      message_id: gmailResult.id || "",
+      thread_id: gmailResult.threadId || "",
+      client_id: client.id,
+      client_name: boyName,
+      school_ids: schools.map((school) => school.id),
+      school_names: schools.map((school) => school.name || "Yeshiva"),
+      sent_by_uid: request.auth.uid,
+      sent_by_email: authUser.email || request.auth.token?.email || "",
+      sent_at: sentAt,
+      created_date: sentAt,
+      updated_date: sentAt,
+    };
+
+    await db.collection("email_logs").add(log);
+    await db.collection("clients").doc(client.id).set(
+      {
+        application_links_email_sent_at: sentAt,
+        application_links_email_to: toEmail,
+        application_links_email_school_ids: log.school_ids,
+        updated_date: sentAt,
+      },
+      { merge: true },
+    );
 
     return {
       sent: true,

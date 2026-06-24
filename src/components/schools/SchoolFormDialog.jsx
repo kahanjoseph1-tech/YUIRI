@@ -18,7 +18,8 @@ const EMPTY = {
   name: "", type: "", location: "", address: "", phone: "", email: "", website: "",
   hashkafa: "", grade_range: "", tuition_range: "", class_size: "",
   boarding: false, accepts_special_needs: false, environment_type: "",
-  contact_person: "", description: "", notes: "", specialties: [],
+  contact_person: "", application_url: "", application_text: "", information_url: "", information_text: "",
+  description: "", notes: "", specialties: [],
 };
 
 function Field({ label, children, full }) {
@@ -125,6 +126,18 @@ export default function SchoolFormDialog({ open, onOpenChange, school, onSave })
           </Field>
           <Field label="Contact Person">
             <Input value={form.contact_person} onChange={(e) => update("contact_person", e.target.value)} />
+          </Field>
+          <Field label="Application Link" full>
+            <Input value={form.application_url || ""} onChange={(e) => update("application_url", e.target.value)} placeholder="https://..." />
+          </Field>
+          <Field label="Application Button Text">
+            <Input value={form.application_text || ""} onChange={(e) => update("application_text", e.target.value)} placeholder="Application" />
+          </Field>
+          <Field label="Information Link">
+            <Input value={form.information_url || ""} onChange={(e) => update("information_url", e.target.value)} placeholder="https://..." />
+          </Field>
+          <Field label="Information Button Text">
+            <Input value={form.information_text || ""} onChange={(e) => update("information_text", e.target.value)} placeholder="Information" />
           </Field>
           <Field label="Tuition Range">
             <Input value={form.tuition_range} onChange={(e) => update("tuition_range", e.target.value)} />

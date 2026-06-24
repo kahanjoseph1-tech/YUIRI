@@ -8,3 +8,9 @@ export async function sendInvoiceEmail(payload) {
   const response = await callSendInvoiceEmail(payload);
   return response.data;
 }
+
+export async function sendApplicationLinksEmail(payload) {
+  const callSendApplicationLinksEmail = httpsCallable(functions, "sendApplicationLinksEmail");
+  const response = await callSendApplicationLinksEmail(payload);
+  return response.data;
+}

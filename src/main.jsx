@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client'
 import App from '@/App.jsx'
 import '@/index.css'
 
-const buildVersion = 'gmail-invoice-send-2026-06-24-1'
+const buildVersion = 'application-link-email-2026-06-24-1'
 
 window.__YUIRI_BUILD_VERSION__ = buildVersion
 
