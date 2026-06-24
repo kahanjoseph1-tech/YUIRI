@@ -36,10 +36,12 @@ import Combobox from "@/components/common/Combobox";
 import ClientFormDrawer from "@/components/clients/ClientFormDrawer";
 import AppointmentFormDialog from "@/components/appointments/AppointmentFormDialog";
 import BillingFormDialog from "@/components/billing/BillingFormDialog";
+import InvoiceDialog from "@/components/billing/InvoiceDialog";
 import RecordPaymentDialog from "@/components/billing/RecordPaymentDialog";
 import SchoolInfoDialog from "@/components/schools/SchoolInfoDialog";
 import {
   ensureEvaluationBillingForAppointment,
+  nextInvoiceNumber,
   recordFinancialTransactionForBillingPayment,
   syncFinancialTransactionForBillingPayment,
 } from "@/lib/automations";
@@ -319,6 +321,7 @@ export default function ClientDetail() {
   const [billOpen, setBillOpen] = useState(false);
   const [editBillingRecord, setEditBillingRecord] = useState(null);
   const [payBillingRecord, setPayBillingRecord] = useState(null);
+  const [invoiceBillingRecord, setInvoiceBillingRecord] = useState(null);
   const [followFormOpen, setFollowFormOpen] = useState(false);
   const [followForm, setFollowForm] = useState(FOLLOW_UP_EMPTY);
   const [recommendSchoolId, setRecommendSchoolId] = useState("");
@@ -423,6 +426,23 @@ export default function ClientDetail() {
       toast.success("Billing updated");
     },
     onError: () => toast.error("Failed to update billing"),
+  });
+
+  const invoiceBill = useMutation({
+    mutationFn: async (record) => {
+      if (record.invoice_number) return record;
+      const invoice_number = nextInvoiceNumber(billing);
+      return firebaseClient.entities.BillingRecord.update(record.id, {
+        invoice_number,
+        billing_status: record.billing_status === "Not Billed" ? "Invoice Sent" : record.billing_status,
+      });
+    },
+    onSuccess: (record) => {
+      queryClient.invalidateQueries({ queryKey: ["billing"] });
+      setInvoiceBillingRecord(record);
+      toast.success(`Invoice ${record.invoice_number} ready`);
+    },
+    onError: () => toast.error("Failed to create invoice"),
   });
 
   const createFollowUp = useMutation({
@@ -924,6 +944,9 @@ export default function ClientDetail() {
 
                   {canBill && (
                     <div className="mt-3 flex flex-wrap justify-end gap-2">
+                      <Button type="button" size="sm" variant="outline" className="gap-1" onClick={() => invoiceBill.mutate(record)} disabled={invoiceBill.isPending}>
+                        <FileText className="w-3 h-3" /> {record.invoice_number ? "Invoice" : "Create Invoice"}
+                      </Button>
                       <Button type="button" size="sm" variant="outline" onClick={() => setEditBillingRecord(record)}>
                         Edit
                       </Button>
@@ -1295,6 +1318,12 @@ export default function ClientDetail() {
         onOpenChange={() => setPayBillingRecord(null)}
         record={payBillingRecord}
         onSave={(data) => updateBill.mutateAsync({ billingId: payBillingRecord.id, data })}
+      />
+      <InvoiceDialog
+        open={!!invoiceBillingRecord}
+        onOpenChange={() => setInvoiceBillingRecord(null)}
+        record={invoiceBillingRecord}
+        client={client}
       />
       <SchoolInfoDialog
         open={schoolInfoOpen}

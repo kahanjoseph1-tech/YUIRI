@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Receipt, Send, DollarSign, Ban } from "lucide-react";
+import { Plus, Receipt, FileText, DollarSign, Ban } from "lucide-react";
 import StatusBadge from "@/components/StatusBadge";
 import BillingFormDialog from "@/components/billing/BillingFormDialog";
+import InvoiceDialog from "@/components/billing/InvoiceDialog";
 import RecordPaymentDialog from "@/components/billing/RecordPaymentDialog";
 import { BILLING_STATUSES } from "@/lib/constants";
 import {
@@ -29,6 +30,7 @@ export default function Billing() {
   const [showForm, setShowForm] = useState(false);
   const [editRecord, setEditRecord] = useState(null);
   const [payRecord, setPayRecord] = useState(null);
+  const [invoiceRecord, setInvoiceRecord] = useState(null);
 
   const { data: billing = [], isLoading } = useQuery({
     queryKey: ["billing"], queryFn: () => firebaseClient.entities.BillingRecord.list("-created_date", 1000),
@@ -78,13 +80,24 @@ export default function Billing() {
     onError: () => toast.error("Update failed"),
   });
 
-  const sendInvoice = (record) => {
-    const invoice_number = nextInvoiceNumber(billing);
-    updateMutation.mutate(
-      { id: record.id, data: { invoice_number, billing_status: "Invoice Sent" } },
-      { onSuccess: () => { invalidate(); toast.success(`Invoice ${invoice_number} sent`); } }
-    );
-  };
+  const invoiceMutation = useMutation({
+    mutationFn: async (record) => {
+      if (record.invoice_number) return record;
+      const invoice_number = nextInvoiceNumber(billing);
+      return firebaseClient.entities.BillingRecord.update(record.id, {
+        invoice_number,
+        billing_status: record.billing_status === "Not Billed" ? "Invoice Sent" : record.billing_status,
+      });
+    },
+    onSuccess: (record) => {
+      invalidate();
+      setInvoiceRecord(record);
+      toast.success(`Invoice ${record.invoice_number} ready`);
+    },
+    onError: () => toast.error("Failed to create invoice"),
+  });
+
+  const openInvoice = (record) => invoiceMutation.mutate(record);
 
   const waive = (record) =>
     updateMutation.mutate(
@@ -184,11 +197,9 @@ export default function Billing() {
                   {canWrite && (
                     <TableCell>
                       <div className="flex items-center justify-end gap-1">
-                        {b.billing_status === "Not Billed" && (
-                          <Button size="sm" variant="outline" className="h-8 gap-1 text-xs" onClick={() => sendInvoice(b)}>
-                            <Send className="w-3 h-3" /> Send Invoice
-                          </Button>
-                        )}
+                        <Button size="sm" variant="outline" className="h-8 gap-1 text-xs" onClick={() => openInvoice(b)} disabled={invoiceMutation.isPending}>
+                          <FileText className="w-3 h-3" /> {b.invoice_number ? "Invoice" : "Create Invoice"}
+                        </Button>
                         {(b.billing_status === "Invoice Sent" || b.billing_status === "Partially Paid") && (
                           <Button size="sm" variant="outline" className="h-8 gap-1 text-xs" onClick={() => setPayRecord(b)}>
                             <DollarSign className="w-3 h-3" /> Record Payment
@@ -211,6 +222,12 @@ export default function Billing() {
 
       <BillingFormDialog open={showForm} onOpenChange={setShowForm} clients={clients} onSave={(data) => createMutation.mutateAsync(data)} />
       <BillingFormDialog open={!!editRecord} onOpenChange={() => setEditRecord(null)} record={editRecord} clients={clients} onSave={(data) => updateMutation.mutateAsync({ id: editRecord.id, data })} />
+      <InvoiceDialog
+        open={!!invoiceRecord}
+        onOpenChange={() => setInvoiceRecord(null)}
+        record={invoiceRecord}
+        client={invoiceRecord ? clients.find((client) => client.id === invoiceRecord.client_id) : null}
+      />
       <RecordPaymentDialog open={!!payRecord} onOpenChange={() => setPayRecord(null)} record={payRecord} onSave={(data) => updateMutation.mutateAsync({ id: payRecord.id, data })} />
     </div>
   );
