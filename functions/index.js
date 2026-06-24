@@ -141,14 +141,15 @@ async function getAccessToken() {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      client_id: GMAIL_CLIENT_ID.value(),
-      client_secret: GMAIL_CLIENT_SECRET.value(),
-      refresh_token: GMAIL_REFRESH_TOKEN.value(),
+      client_id: cleanString(GMAIL_CLIENT_ID.value()),
+      client_secret: cleanString(GMAIL_CLIENT_SECRET.value()),
+      refresh_token: cleanString(GMAIL_REFRESH_TOKEN.value()),
       grant_type: "refresh_token",
     }),
   });
 
   if (!response.ok) {
+    console.error("Gmail token refresh failed", { status: response.status });
     throw new HttpsError("internal", "Gmail authorization failed.");
   }
 
@@ -168,6 +169,7 @@ async function sendGmailMessage(rawMessage) {
   });
 
   if (!response.ok) {
+    console.error("Gmail send failed", { status: response.status });
     throw new HttpsError("internal", "Gmail could not send the invoice email.");
   }
 
