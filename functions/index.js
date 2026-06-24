@@ -74,42 +74,101 @@ function valueLine(label, value) {
   return text ? `${label}: ${text}` : "";
 }
 
-function linkHtml(label, href) {
+function normalizedUrl(value) {
+  return cleanString(value).replace(/\/+$/, "").toLowerCase();
+}
+
+function linkButton(label, href, tone = "primary") {
   const cleanHref = cleanString(href);
   if (!cleanHref) return "";
-  return `<p style="margin:6px 0"><strong>${escapeHtml(label)}:</strong> <a href="${escapeHtml(cleanHref)}">${escapeHtml(cleanHref)}</a></p>`;
+  const styles = tone === "primary"
+    ? "background:#1e3a5f;color:#ffffff;border:1px solid #1e3a5f"
+    : "background:#ffffff;color:#1e3a5f;border:1px solid #bfdbfe";
+  return `<a href="${escapeHtml(cleanHref)}" style="display:inline-block;margin:8px 8px 0 0;padding:10px 14px;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px;${styles}">${escapeHtml(label)}</a>`;
+}
+
+function schoolLinks(school) {
+  const links = [];
+  const addLink = (label, href, tone) => {
+    const cleanHref = cleanString(href);
+    if (!cleanHref) return;
+    const key = normalizedUrl(cleanHref);
+    if (links.some((link) => link.key === key)) return;
+    links.push({ label, href: cleanHref, tone, key });
+  };
+
+  addLink("Open Application", school.application_url, "primary");
+  addLink("School Information", school.information_url, "secondary");
+  return links;
 }
 
 function schoolTextBlock(school) {
+  const links = schoolLinks(school);
   return [
     cleanString(school.name, "Yeshiva"),
-    valueLine("Location", school.location || school.address),
+    valueLine("Type", school.type),
+    valueLine("Grades", school.grade_range),
+    valueLine("Location", school.location),
+    valueLine("Address", school.address),
     valueLine("Phone", school.phone),
     valueLine("Email", school.email),
-    valueLine("Website", school.website),
-    valueLine(school.application_text || "Application", school.application_url),
-    valueLine(school.information_text || "Information", school.information_url),
     valueLine("Contact", school.contact_person),
-    valueLine("Notes", school.description || school.notes),
+    ...links.map((link) => valueLine(link.label, link.href)),
   ].filter(Boolean).join("\r\n");
 }
 
-function schoolHtmlBlock(school) {
-  const details = [
-    school.location || school.address,
-    school.phone,
-    school.email,
-    school.website,
-    school.contact_person ? `Contact: ${school.contact_person}` : "",
-  ].filter(Boolean);
+function detailPill(label, value) {
+  const text = cleanString(value);
+  if (!text) return "";
+  return `
+    <div style="display:inline-block;margin:0 6px 6px 0;padding:6px 9px;border-radius:999px;background:#f8fafc;border:1px solid #e2e8f0;color:#475569;font-size:13px">
+      <strong style="color:#64748b">${escapeHtml(label)}:</strong> <span dir="auto">${escapeHtml(text)}</span>
+    </div>
+  `.trim();
+}
+
+function contactRow(label, value) {
+  const text = cleanString(value);
+  if (!text) return "";
+  return `
+    <tr>
+      <td style="padding:4px 14px 4px 0;color:#64748b;font-size:13px;font-weight:700;white-space:nowrap;vertical-align:top">${escapeHtml(label)}</td>
+      <td dir="auto" style="padding:4px 0;color:#111827;font-size:14px;vertical-align:top">${escapeHtml(text)}</td>
+    </tr>
+  `.trim();
+}
+
+function schoolHtmlBlock(school, index) {
+  const links = schoolLinks(school);
+  const pills = [
+    detailPill("Type", school.type),
+    detailPill("Grades", school.grade_range),
+    detailPill("Location", school.location),
+  ].filter(Boolean).join("");
+
+  const contactRows = [
+    contactRow("Address", school.address),
+    contactRow("Phone", school.phone),
+    contactRow("Email", school.email),
+    contactRow("Contact", school.contact_person),
+    contactRow("Website", school.website),
+  ].filter(Boolean).join("");
 
   return `
-    <div style="border:1px solid #e5e7eb;border-radius:12px;padding:14px;margin:14px 0;background:#ffffff">
-      <h3 style="margin:0 0 8px;font-size:17px;color:#111827">${escapeHtml(school.name || "Yeshiva")}</h3>
-      ${details.length ? `<p style="margin:0 0 8px;color:#4b5563">${details.map(escapeHtml).join(" &middot; ")}</p>` : ""}
-      ${linkHtml(school.application_text || "Application", school.application_url)}
-      ${linkHtml(school.information_text || "Information", school.information_url)}
-      ${school.description || school.notes ? `<p style="margin:10px 0 0;color:#4b5563;white-space:pre-wrap">${escapeHtml(school.description || school.notes)}</p>` : ""}
+    <div style="border:1px solid #dbe4ef;border-radius:14px;padding:18px;margin:16px 0;background:#ffffff">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse">
+        <tr>
+          <td style="width:40px;vertical-align:top">
+            <div style="width:30px;height:30px;line-height:30px;text-align:center;border-radius:999px;background:#1e3a5f;color:#ffffff;font-weight:700">${index + 1}</div>
+          </td>
+          <td style="vertical-align:top">
+            <h3 dir="auto" style="margin:1px 0 10px;font-size:18px;line-height:1.35;color:#111827">${escapeHtml(school.name || "Yeshiva")}</h3>
+            ${pills ? `<div style="margin-bottom:8px">${pills}</div>` : ""}
+            ${contactRows ? `<table role="presentation" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin:8px 0 2px">${contactRows}</table>` : ""}
+            ${links.length ? `<div style="margin-top:10px">${links.map((link) => linkButton(link.label, link.href, link.tone)).join("")}</div>` : `<p style="margin:10px 0 0;color:#b45309;font-size:13px">No application link saved for this yeshiva.</p>`}
+          </td>
+        </tr>
+      </table>
     </div>
   `.trim();
 }
@@ -243,13 +302,13 @@ function buildInvoiceMessage({ toEmail, senderEmail, fatherName, boyName, servic
 function buildApplicationLinksMessage({ toEmail, senderEmail, fatherName, boyName, schools }) {
   const fromName = senderDisplayName();
   const greetingName = fatherName || boyName || "there";
-  const subject = `Yeshiva application links${boyName ? ` for ${boyName}` : ""}`;
+  const subject = `Yeshiva applications${boyName ? ` for ${boyName}` : ""}`;
   const boundary = `yuiri_application_${Date.now()}`;
 
   const textBody = [
     `Dear ${greetingName},`,
     "",
-    `Please see below the yeshiva information and application links for ${boyName || "your son"}.`,
+    `Please see below the recommended yeshivas and application links for ${boyName || "your son"}.`,
     "",
     ...schools.flatMap((school, index) => [
       `${index + 1}. ${schoolTextBlock(school)}`,
@@ -262,13 +321,19 @@ function buildApplicationLinksMessage({ toEmail, senderEmail, fatherName, boyNam
   ].join("\r\n");
 
   const htmlBody = `
-    <div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.6;color:#111827;background:#f8fafc;padding:18px">
-      <div style="max-width:680px;margin:0 auto;background:#ffffff;border-radius:16px;padding:22px;border:1px solid #e5e7eb">
-        <p>Dear <span dir="auto">${escapeHtml(greetingName)}</span>,</p>
-        <p>Please see below the yeshiva information and application links for <strong dir="auto">${escapeHtml(boyName || "your son")}</strong>.</p>
-        ${schools.map(schoolHtmlBlock).join("")}
-        <p>Please let me know if you have any questions or require any further information.</p>
-        <p>Best regards,<br><span dir="rtl">${escapeHtml(fromName)}</span></p>
+    <div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.6;color:#111827;background:#f8fafc;padding:22px">
+      <div style="max-width:720px;margin:0 auto;background:#ffffff;border-radius:18px;border:1px solid #e5e7eb;overflow:hidden">
+        <div style="background:#1e3a5f;color:#ffffff;padding:20px 24px">
+          <div style="font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#bfdbfe;font-weight:700">Yuiri Support</div>
+          <div style="font-size:24px;font-weight:800;margin-top:4px">Yeshiva Recommendations</div>
+        </div>
+        <div style="padding:22px 24px">
+          <p style="margin:0 0 12px">Dear <span dir="auto">${escapeHtml(greetingName)}</span>,</p>
+          <p style="margin:0 0 18px">Please see below the recommended yeshivas and application links for <strong dir="auto">${escapeHtml(boyName || "your son")}</strong>.</p>
+          ${schools.map((school, index) => schoolHtmlBlock(school, index)).join("")}
+          <p style="margin:20px 0 0">Please let me know if you have any questions or require any further information.</p>
+          <p style="margin:18px 0 0">Best regards,<br><span dir="rtl">${escapeHtml(fromName)}</span></p>
+        </div>
       </div>
     </div>
   `.trim();
