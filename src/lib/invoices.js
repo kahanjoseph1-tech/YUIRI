@@ -1,5 +1,8 @@
+import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
-import { fmtCurrency, fmtDate, fmtDateTime } from "@/lib/format";
+import { fmtCurrency } from "@/lib/format";
+
+export const INVOICE_LOGO_SRC = "/yuiri-logo.jpg";
 
 export function clientDisplayName(client) {
   return `${client?.boy_first_name || ""} ${client?.boy_last_name || ""}`.trim() || "Client";
@@ -29,107 +32,58 @@ export function invoiceFileName(record, client) {
   return `Yuiri-${invoiceNumber}${name ? `-${name}` : ""}.pdf`;
 }
 
-function invoiceRows(record, client) {
-  return [
-    ["Invoice #", record?.invoice_number || ""],
-    ["Invoice Date", fmtDate(record?.updated_date || record?.created_date || new Date())],
-    ["Father", client?.father_name || ""],
-    ["Boy", clientDisplayName(client)],
-    ["Phone", primaryPhone(client)],
-    ["Email", client?.parent_email || ""],
-    ["Service", record?.service_type || "Service"],
-    ["Status", record?.billing_status || ""],
-  ];
-}
-
-export function createInvoicePdf(record, client) {
-  const doc = new jsPDF({ unit: "pt", format: "letter" });
-  const left = 48;
-  let y = 52;
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(20);
-  doc.text("Yuiri", left, y);
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  doc.text("Placement CRM", left, y + 16);
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(24);
-  doc.text("Invoice", 440, y);
-
-  y += 58;
-  doc.setDrawColor(226, 232, 240);
-  doc.line(left, y, 564, y);
-  y += 28;
-
-  doc.setFontSize(10);
-  invoiceRows(record, client).forEach(([label, value]) => {
-    if (!value) return;
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(100, 116, 139);
-    doc.text(`${label}:`, left, y);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(15, 23, 42);
-    doc.text(String(value), 150, y);
-    y += 20;
-  });
-
-  y += 18;
-  doc.setFillColor(248, 250, 252);
-  doc.setDrawColor(226, 232, 240);
-  doc.roundedRect(left, y, 516, 112, 8, 8, "FD");
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.setTextColor(100, 116, 139);
-  doc.text("Bill", left + 18, y + 28);
-  doc.text("Amount", 486, y + 28, { align: "right" });
-
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(15, 23, 42);
-  doc.text(record?.service_type || "Service", left + 18, y + 54);
-  doc.text(fmtCurrency(record?.amount || 0), 486, y + 54, { align: "right" });
-
-  doc.setDrawColor(226, 232, 240);
-  doc.line(left + 18, y + 72, 546, y + 72);
-
-  doc.setFont("helvetica", "bold");
-  doc.text("Paid", left + 18, y + 92);
-  doc.text(fmtCurrency(invoicePaidAmount(record)), 486, y + 92, { align: "right" });
-  doc.text("Balance Due", left + 18, y + 112);
-  doc.text(fmtCurrency(invoiceBalance(record)), 486, y + 112, { align: "right" });
-
-  if (record?.payment_date || record?.paid_date || record?.payment_method || record?.payment_note) {
-    y += 150;
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(100, 116, 139);
-    doc.text("Payment", left, y);
-    y += 18;
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(15, 23, 42);
-    if (record.payment_date || record.paid_date) {
-      doc.text(`Paid time: ${fmtDateTime(record.payment_date || record.paid_date)}`, left, y);
-      y += 16;
-    }
-    if (record.payment_method) {
-      doc.text(`Method: ${record.payment_method}`, left, y);
-      y += 16;
-    }
-    if (record.payment_note) {
-      doc.text(`Note: ${record.payment_note}`, left, y, { maxWidth: 460 });
-    }
+async function waitForInvoiceAssets(element) {
+  if (document.fonts?.ready) {
+    await document.fonts.ready.catch(() => {});
   }
 
-  doc.setFontSize(9);
-  doc.setTextColor(148, 163, 184);
-  doc.text("Thank you.", left, 738);
+  const images = Array.from(element.querySelectorAll("img"));
+  await Promise.all(
+    images.map((image) => {
+      if (image.complete) return Promise.resolve();
+      return new Promise((resolve) => {
+        image.addEventListener("load", resolve, { once: true });
+        image.addEventListener("error", resolve, { once: true });
+      });
+    }),
+  );
+}
 
+export async function createInvoicePdf(_record, _client, element) {
+  if (!element) {
+    throw new Error("Invoice preview is required to create the PDF.");
+  }
+
+  await waitForInvoiceAssets(element);
+
+  const canvas = await html2canvas(element, {
+    backgroundColor: "#ffffff",
+    logging: false,
+    scale: 2,
+    useCORS: true,
+  });
+  const doc = new jsPDF({ unit: "pt", format: "letter" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 36;
+  const maxWidth = pageWidth - margin * 2;
+  const maxHeight = pageHeight - margin * 2;
+
+  let imageWidth = maxWidth;
+  let imageHeight = (canvas.height * imageWidth) / canvas.width;
+  if (imageHeight > maxHeight) {
+    imageHeight = maxHeight;
+    imageWidth = (canvas.width * imageHeight) / canvas.height;
+  }
+
+  const x = (pageWidth - imageWidth) / 2;
+  doc.addImage(canvas.toDataURL("image/png"), "PNG", x, margin, imageWidth, imageHeight, undefined, "FAST");
   return doc;
 }
 
-export function downloadInvoicePdf(record, client) {
-  createInvoicePdf(record, client).save(invoiceFileName(record, client));
+export async function downloadInvoicePdf(record, client, element) {
+  const doc = await createInvoicePdf(record, client, element);
+  doc.save(invoiceFileName(record, client));
 }
 
 export function invoiceEmailBody(record, client) {

@@ -14,6 +14,8 @@ import { useRole } from "@/lib/useRole";
 import { navItemsForRole } from "@/lib/roles";
 import { ROLE_LABELS } from "@/lib/constants";
 
+const YUIRI_LOGO_SRC = "/yuiri-logo.jpg";
+
 const ICONS = {
   LayoutDashboard, Users, Calendar, ClipboardList,
   GraduationCap, BriefcaseBusiness, ArrowRightLeft, DollarSign, BarChart3, Settings,
@@ -40,7 +42,10 @@ export default function Layout({ children, currentPageName }) {
         <button onClick={() => setSidebarOpen(true)} className="p-2 -ml-2 rounded-lg hover:bg-white/10 transition-colors">
           <Menu className="w-5 h-5 text-white" />
         </button>
-        <span className="font-bold text-white text-lg tracking-tight">Yuiri</span>
+        <div className="flex items-center gap-2">
+          <img src={YUIRI_LOGO_SRC} alt="Yuiri Support" className="h-8 w-8 rounded-md bg-white object-cover" />
+          <span className="font-bold text-white text-lg tracking-tight">Yuiri</span>
+        </div>
         <div className="w-9" />
       </div>
 
@@ -77,11 +82,14 @@ function SidebarContent({ currentPageName, navItems, user, role, onClose }) {
   return (
     <div className="flex flex-col h-full bg-[#1e3a5f] text-slate-200">
       <div className="px-5 pt-5 pb-4 flex items-center justify-between">
-        <div>
-          <h1 className="font-bold text-white text-2xl tracking-tight leading-none">Yuiri</h1>
-          <p className="text-[10px] text-blue-200/70 font-medium tracking-widest uppercase mt-1">
-            Placement CRM
-          </p>
+        <div className="flex min-w-0 items-center gap-3">
+          <img src={YUIRI_LOGO_SRC} alt="Yuiri Support" className="h-12 w-12 rounded-lg bg-white object-cover" />
+          <div className="min-w-0">
+            <h1 className="font-bold text-white text-2xl tracking-tight leading-none">Yuiri</h1>
+            <p className="text-[10px] text-blue-200/70 font-medium tracking-widest uppercase mt-1">
+              Support CRM
+            </p>
+          </div>
         </div>
         {onClose && (
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 lg:hidden">

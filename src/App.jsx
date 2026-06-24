@@ -128,8 +128,9 @@ function LoginScreen({ authError }) {
     <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
+          <img src="/yuiri-logo.jpg" alt="Yuiri Support" className="mx-auto mb-3 h-20 w-20 rounded-xl bg-white object-cover shadow-sm" />
           <h1 className="text-3xl font-bold text-[#1e3a5f]">Yuiri</h1>
-          <p className="text-sm text-slate-500 mt-1">Placement CRM</p>
+          <p className="text-sm text-slate-500 mt-1">Support CRM</p>
         </div>
 
         <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6 space-y-4">
