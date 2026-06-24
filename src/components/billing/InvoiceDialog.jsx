@@ -9,13 +9,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import StatusBadge from "@/components/StatusBadge";
 import {
   clientDisplayName,
+  createInvoicePdf,
   downloadInvoicePdf,
   INVOICE_LOGO_SRC,
   invoiceBalance,
+  invoiceFileName,
   invoicePaidAmount,
-  openInvoiceEmailDraft,
   primaryPhone,
 } from "@/lib/invoices";
+import { sendInvoiceEmail } from "@/lib/invoiceEmail";
 import { fmtCurrency, fmtDate, fmtDateTime } from "@/lib/format";
 
 export default function InvoiceDialog({ open, onOpenChange, record, client }) {
@@ -23,6 +25,7 @@ export default function InvoiceDialog({ open, onOpenChange, record, client }) {
   const [recipientMode, setRecipientMode] = useState("profile");
   const [customEmail, setCustomEmail] = useState("");
   const [downloading, setDownloading] = useState(false);
+  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -57,8 +60,35 @@ export default function InvoiceDialog({ open, onOpenChange, record, client }) {
       toast.error("Enter an email address");
       return;
     }
-    openInvoiceEmailDraft(record, client, recipient);
-    toast.success("Email draft opened");
+    if (!invoicePreviewRef.current) {
+      toast.error("Invoice preview is not ready");
+      return;
+    }
+
+    setSending(true);
+    createInvoicePdf(record, client, invoicePreviewRef.current)
+      .then((doc) => {
+        const dataUri = doc.output("datauristring");
+        const attachmentBase64 = dataUri.split(",")[1] || "";
+        return sendInvoiceEmail({
+          toEmail: recipient,
+          billingRecordId: record.id || "",
+          clientId: client?.id || record.client_id || "",
+          invoiceNumber: record.invoice_number || "",
+          serviceType: record.service_type || "Evaluation",
+          fatherName: client?.father_name || "",
+          clientName: clientDisplayName(client),
+          attachmentFileName: invoiceFileName(record, client),
+          attachmentBase64,
+        });
+      })
+      .then(() => {
+        toast.success(`Invoice email sent to ${recipient}`);
+      })
+      .catch((error) => {
+        toast.error(error?.message || "Failed to send invoice email");
+      })
+      .finally(() => setSending(false));
   };
 
   return (
@@ -173,8 +203,8 @@ export default function InvoiceDialog({ open, onOpenChange, record, client }) {
           <Button variant="outline" className="gap-2" onClick={handleDownload} disabled={downloading}>
             <Download className="w-4 h-4" /> {downloading ? "Preparing..." : "Download PDF"}
           </Button>
-          <Button className="gap-2 bg-[#1e3a5f] hover:bg-[#1e3a5f]/90" onClick={handleEmail}>
-            <Mail className="w-4 h-4" /> Open Email Draft
+          <Button className="gap-2 bg-[#1e3a5f] hover:bg-[#1e3a5f]/90" onClick={handleEmail} disabled={sending}>
+            <Mail className="w-4 h-4" /> {sending ? "Sending..." : "Send Email"}
           </Button>
         </DialogFooter>
       </DialogContent>
