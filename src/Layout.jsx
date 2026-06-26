@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
+import { useQueries } from "@tanstack/react-query";
 import { createPageUrl } from "@/utils";
 import {
   LayoutDashboard, Users, Calendar, ClipboardList, GraduationCap,
@@ -13,6 +14,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { useRole } from "@/lib/useRole";
 import { navItemsForRole } from "@/lib/roles";
 import { ROLE_LABELS } from "@/lib/constants";
+import { firebaseClient } from "@/api/firebaseClient";
 
 const YUIRI_LOGO_SRC = "/yuiri-logo.jpg";
 
@@ -20,6 +22,86 @@ const ICONS = {
   LayoutDashboard, Users, Calendar, ClipboardList,
   GraduationCap, BriefcaseBusiness, ArrowRightLeft, DollarSign, BarChart3, Settings,
 };
+
+const COUNT_QUERIES = {
+  Clients: {
+    queryKey: ["clients"],
+    queryFn: () => firebaseClient.entities.Client.list("-created_date", 1000),
+  },
+  Appointments: {
+    queryKey: ["appointments"],
+    queryFn: () => firebaseClient.entities.Appointment.list("-date_time", 1000),
+  },
+  Evaluations: {
+    queryKey: ["evaluations"],
+    queryFn: () => firebaseClient.entities.Evaluation.list("-created_date", 1000),
+  },
+  OpenCases: {
+    queryKey: ["open_cases"],
+    queryFn: () => firebaseClient.entities.OpenCase.list("-created_date", 1000),
+    count: (rows) => rows.filter((record) => (record.status || "Open") !== "Closed").length,
+  },
+  Schools: {
+    queryKey: ["schools"],
+    queryFn: () => firebaseClient.entities.School.list("-created_date", 1000),
+  },
+  Placements: {
+    queryKey: ["placements"],
+    queryFn: () => firebaseClient.entities.Placement.list("-created_date", 1000),
+  },
+  Billing: {
+    queryKey: ["billing"],
+    queryFn: () => firebaseClient.entities.BillingRecord.list("-created_date", 1000),
+  },
+  Financials: {
+    queryKey: ["financials"],
+    queryFn: () => firebaseClient.entities.FinancialTransaction.list("-transaction_date", 1000),
+  },
+  Users: {
+    queryKey: ["users"],
+    queryFn: () => firebaseClient.entities.User.list("-created_date", 1000),
+  },
+};
+
+function useSidebarCounts(navItems) {
+  const countItems = navItems.filter((item) => COUNT_QUERIES[item.key]);
+  const results = useQueries({
+    queries: countItems.map((item) => {
+      const config = COUNT_QUERIES[item.key];
+      return {
+        queryKey: config.queryKey,
+        queryFn: config.queryFn,
+        staleTime: 60_000,
+        select: (rows = []) => (config.count ? config.count(rows) : rows.length),
+      };
+    }),
+  });
+
+  return countItems.reduce((counts, item, index) => {
+    const result = results[index];
+    counts[item.key] = {
+      value: Number.isFinite(result.data) ? result.data : 0,
+      isLoaded: result.isSuccess,
+    };
+    return counts;
+  }, {});
+}
+
+function CountBadge({ count, isActive }) {
+  if (!count?.isLoaded) return null;
+
+  return (
+    <span
+      className={`ml-auto min-w-7 rounded-full px-2 py-0.5 text-center text-xs font-semibold tabular-nums ${
+        isActive
+          ? "bg-white/20 text-white"
+          : "bg-blue-950/35 text-blue-100 ring-1 ring-white/10"
+      }`}
+    >
+      {count.value.toLocaleString()}
+    </span>
+  );
+}
 
 export default function Layout({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -78,6 +160,7 @@ function SidebarContent({ currentPageName, navItems, user, role, onClose }) {
   const { logout } = useAuth();
   const roleLabel = ROLE_LABELS[role] || role || "User";
   const name = user?.full_name || user?.name || user?.email || "User";
+  const counts = useSidebarCounts(navItems);
 
   return (
     <div className="flex flex-col h-full bg-[#1e3a5f] text-slate-200">
@@ -113,8 +196,11 @@ function SidebarContent({ currentPageName, navItems, user, role, onClose }) {
                   : "text-blue-100/80 hover:text-white hover:bg-white/10"
               }`}
             >
-              <Icon className="w-[18px] h-[18px]" />
-              {item.label}
+              <span className="flex min-w-0 items-center gap-3">
+                <Icon className="w-[18px] h-[18px] flex-shrink-0" />
+                <span className="truncate">{item.label}</span>
+              </span>
+              <CountBadge count={counts[item.key]} isActive={isActive} />
             </Link>
           );
         })}
