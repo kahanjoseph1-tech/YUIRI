@@ -125,11 +125,6 @@ export default function AppointmentFormDialog({
     [dropdownOptions.meeting_types, form.meeting_type]
   );
 
-  const appointmentStatusOptions = useMemo(
-    () => uniqueOptions([...(dropdownOptions.appointment_statuses || []), form.status]),
-    [dropdownOptions.appointment_statuses, form.status]
-  );
-
   const locationOptions = useMemo(
     () => uniqueOptions([...(dropdownOptions.appointment_locations || []), form.location]),
     [dropdownOptions.appointment_locations, form.location]
@@ -287,15 +282,6 @@ export default function AppointmentFormDialog({
               <Input value={form.location || ""} onChange={(e) => update("location", e.target.value)} placeholder="Office" />
             </div>
           </div>
-          {appointment && (
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-gray-500">Status</Label>
-              <Select value={form.status} onValueChange={(v) => update("status", v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{appointmentStatusOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-          )}
           {(form.meeting_type || "Evaluation") === "Evaluation" && (
           <div className="rounded-lg border border-gray-100 p-3 space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

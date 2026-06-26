@@ -3,7 +3,6 @@ import { firebaseClient } from "@/api/firebaseClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, CalendarDays, Clock, List, Calendar as CalendarIcon } from "lucide-react";
 import StatusBadge from "@/components/StatusBadge";
@@ -11,7 +10,6 @@ import AppointmentFormDialog from "@/components/appointments/AppointmentFormDial
 import AppointmentCalendar from "@/components/appointments/AppointmentCalendar";
 import AvailabilityDialog from "@/components/appointments/AvailabilityDialog";
 import DayScheduleDialog from "@/components/appointments/DayScheduleDialog";
-import { APPOINTMENT_STATUSES } from "@/lib/constants";
 import { ensureEvaluationBillingForAppointment, onAppointmentCompleted, syncDueEvaluationAppointments } from "@/lib/automations";
 import { can } from "@/lib/roles";
 import { useRole } from "@/lib/useRole";
@@ -35,7 +33,6 @@ export default function Appointments() {
   const canWrite = can(role, "appointments.write");
 
   const [view, setView] = useState("calendar");
-  const [statusFilter, setStatusFilter] = useState("all");
   const [showForm, setShowForm] = useState(false);
   const [showAvailability, setShowAvailability] = useState(false);
   const [editAppt, setEditAppt] = useState(null);
@@ -141,9 +138,7 @@ export default function Appointments() {
   });
 
   const roleVisibleAppointments = useMemo(() => appointments, [appointments]);
-
-  let visible = roleVisibleAppointments;
-  if (statusFilter !== "all") visible = visible.filter((a) => a.status === statusFilter);
+  const visible = roleVisibleAppointments;
 
   const sortedAvailabilitySlots = useMemo(
     () => [...availabilitySlots].sort((a, b) => {
@@ -188,16 +183,6 @@ export default function Appointments() {
             </Button>
           )}
         </div>
-      </div>
-
-      <div className="flex justify-end">
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-44"><SelectValue placeholder="Status" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            {APPOINTMENT_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-          </SelectContent>
-        </Select>
       </div>
 
       {isLoading ? (

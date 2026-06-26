@@ -23,6 +23,25 @@ const ICONS = {
   GraduationCap, BriefcaseBusiness, ArrowRightLeft, DollarSign, BarChart3, Settings,
 };
 
+function asTime(value) {
+  if (!value) return null;
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? null : time;
+}
+
+function localDateKey(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function uniqueCount(rows, keyForRow) {
+  return new Set(rows.map(keyForRow).filter(Boolean)).size;
+}
+
 const COUNT_QUERIES = {
   Clients: {
     queryKey: ["clients"],
@@ -31,10 +50,26 @@ const COUNT_QUERIES = {
   Appointments: {
     queryKey: ["appointments"],
     queryFn: () => firebaseClient.entities.Appointment.list("-date_time", 1000),
+    count: (rows) => {
+      const now = Date.now();
+      return rows.filter((appointment) => {
+        const appointmentTime = asTime(appointment.date_time);
+        if (!appointmentTime || appointmentTime < now) return false;
+        return appointment.status !== "Cancelled" && appointment.status !== "No Show";
+      }).length;
+    },
   },
   Evaluations: {
     queryKey: ["evaluations"],
     queryFn: () => firebaseClient.entities.Evaluation.list("-created_date", 1000),
+    count: (rows) => {
+      const todayKey = localDateKey(new Date());
+      return rows.filter((evaluation) => {
+        const status = evaluation.status || "Pending";
+        const evaluationDateKey = localDateKey(evaluation.appointment_date || evaluation.created_date);
+        return ["Pending", "In Progress", "Completed"].includes(status) && evaluationDateKey === todayKey;
+      }).length;
+    },
   },
   OpenCases: {
     queryKey: ["open_cases"],
@@ -48,6 +83,7 @@ const COUNT_QUERIES = {
   Placements: {
     queryKey: ["placements"],
     queryFn: () => firebaseClient.entities.Placement.list("-created_date", 1000),
+    count: (rows) => uniqueCount(rows, (placement) => placement.client_id || placement.client_name),
   },
   Billing: {
     queryKey: ["billing"],

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { firebaseClient } from "@/api/firebaseClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -15,6 +15,56 @@ import { PLACEMENT_STATUSES } from "@/lib/constants";
 import { onPlacementEnrolled } from "@/lib/automations";
 import { can } from "@/lib/roles";
 import { useRole } from "@/lib/useRole";
+
+function placementClientKey(placement) {
+  return placement.client_id || placement.client_name || placement.id;
+}
+
+function placementPriority(placement) {
+  if (placement.is_final || placement.status === "Enrolled") return 0;
+  if (placement.status === "Accepted") return 1;
+  if (placement.status === "Recommended") return 2;
+  return 3;
+}
+
+function placementDateValue(placement) {
+  const value = placement.closed_date || placement.decision_date || placement.updated_date || placement.created_date;
+  const time = Date.parse(value || "");
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function groupedPlacementRows(placements) {
+  const groups = new Map();
+
+  placements.forEach((placement) => {
+    const key = placementClientKey(placement);
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        clientName: placement.client_name || "Client",
+        placements: [],
+      });
+    }
+    groups.get(key).placements.push(placement);
+  });
+
+  return Array.from(groups.values())
+    .map((group) => ({
+      ...group,
+      placements: [...group.placements].sort((a, b) => {
+        const priorityDiff = placementPriority(a) - placementPriority(b);
+        if (priorityDiff !== 0) return priorityDiff;
+        return placementDateValue(b) - placementDateValue(a);
+      }),
+    }))
+    .sort((a, b) => a.clientName.localeCompare(b.clientName));
+}
+
+function summaryPlacement(placements) {
+  return placements.find((placement) => placement.is_final || placement.status === "Enrolled") ||
+    placements.find((placement) => placement.status === "Accepted") ||
+    placements[0];
+}
 
 export default function Placements() {
   const queryClient = useQueryClient();
@@ -71,13 +121,16 @@ export default function Placements() {
   });
 
   const visible = statusFilter === "all" ? placements : placements.filter((p) => p.status === statusFilter);
+  const groupedVisible = useMemo(() => groupedPlacementRows(visible), [visible]);
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Placements</h1>
-          <p className="text-sm text-gray-500 mt-1">{visible.length} placements</p>
+          <p className="text-sm text-gray-500 mt-1">
+            {groupedVisible.length} clients{visible.length !== groupedVisible.length ? `, ${visible.length} yeshiva records` : ""}
+          </p>
         </div>
         {canWrite && (
           <Button onClick={() => setShowMatch(true)} className="bg-[#1e3a5f] hover:bg-[#1e3a5f]/90 gap-2">
@@ -99,7 +152,7 @@ export default function Placements() {
       <div className="bg-white rounded-2xl border border-gray-100">
         {isLoading ? (
           <div className="p-5 space-y-3">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10" />)}</div>
-        ) : visible.length === 0 ? (
+        ) : groupedVisible.length === 0 ? (
           <div className="text-center py-16">
             <ArrowRightLeft className="w-10 h-10 text-gray-200 mx-auto mb-3" />
             <p className="text-gray-400 text-sm">No placements yet</p>
@@ -109,22 +162,46 @@ export default function Placements() {
             <TableHeader>
               <TableRow>
                 <TableHead>Client</TableHead>
-                <TableHead>Yeshiva</TableHead>
-                <TableHead>Match</TableHead>
+                <TableHead>Yeshiva Recommendations</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {visible.map((p) => (
-                <TableRow key={p.id} className={canWrite ? "cursor-pointer" : ""} onClick={() => (canWrite ? setEditPlacement(p) : null)}>
-                  <TableCell className="font-medium text-gray-900">{p.client_name || "—"}</TableCell>
-                  <TableCell className="text-gray-600">{p.school_name || "—"}</TableCell>
-                  <TableCell>
-                    {p.match_score != null ? <Badge variant="outline" className="text-[10px]">{p.match_score}</Badge> : <span className="text-gray-400">—</span>}
-                  </TableCell>
-                  <TableCell><StatusBadge status={p.status} /></TableCell>
-                </TableRow>
-              ))}
+              {groupedVisible.map((group) => {
+                const summary = summaryPlacement(group.placements);
+                return (
+                  <TableRow key={group.key}>
+                    <TableCell className="align-top font-medium text-gray-900">{group.clientName || "Client"}</TableCell>
+                    <TableCell>
+                      <div className="space-y-2">
+                        {group.placements.map((placement) => (
+                          <button
+                            key={placement.id}
+                            type="button"
+                            disabled={!canWrite}
+                            onClick={() => setEditPlacement(placement)}
+                            className={`w-full rounded-lg border border-gray-100 px-3 py-2 text-left transition-colors ${
+                              canWrite ? "hover:border-blue-200 hover:bg-blue-50/40" : "cursor-default"
+                            }`}
+                          >
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-sm font-medium text-gray-900">{placement.school_name || "Yeshiva"}</span>
+                              {placement.match_score != null && (
+                                <Badge variant="outline" className="text-[10px]">Match {placement.match_score}</Badge>
+                              )}
+                              <StatusBadge status={placement.status} />
+                            </div>
+                            {placement.match_reasons && (
+                              <p className="mt-1 line-clamp-1 text-xs text-gray-400">{placement.match_reasons}</p>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell className="align-top"><StatusBadge status={summary?.status} /></TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         )}
