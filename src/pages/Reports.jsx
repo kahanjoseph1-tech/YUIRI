@@ -7,7 +7,12 @@ import {
 } from "recharts";
 import { format, parseISO } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CLIENT_STATUSES } from "@/lib/constants";
+import {
+  DEFAULT_DROPDOWN_OPTIONS,
+  DROPDOWN_OPTIONS_QUERY_KEY,
+  getDropdownOptions,
+  uniqueOptions,
+} from "@/lib/dropdownSettings";
 import { fmtCurrency } from "@/lib/format";
 
 const COLORS = ["#1e3a5f", "#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444", "#06b6d4", "#ec4899", "#64748b", "#84cc16"];
@@ -23,6 +28,20 @@ function ChartCard({ title, children }) {
   );
 }
 
+function placementGroupingValue(placement, school, grouping) {
+  switch (grouping) {
+    case "Yeshiva Type":
+      return school?.type || "Other";
+    case "Environment Type":
+      return school?.environment_type || "Other";
+    case "Location":
+      return school?.location || "Other";
+    case "Hashkafa":
+    default:
+      return school?.hashkafa || "Other";
+  }
+}
+
 export default function Reports() {
   const { data: clients = [], isLoading: l1 } = useQuery({ queryKey: ["clients"], queryFn: () => firebaseClient.entities.Client.list("-created_date", 1000) });
   const { data: appointments = [], isLoading: l2 } = useQuery({ queryKey: ["appointments"], queryFn: () => firebaseClient.entities.Appointment.list("-date_time", 1000) });
@@ -30,12 +49,16 @@ export default function Reports() {
   const { data: billing = [], isLoading: l4 } = useQuery({ queryKey: ["billing"], queryFn: () => firebaseClient.entities.BillingRecord.list("-created_date", 1000) });
   const { data: placements = [], isLoading: l5 } = useQuery({ queryKey: ["placements"], queryFn: () => firebaseClient.entities.Placement.list("-created_date", 1000) });
   const { data: schools = [] } = useQuery({ queryKey: ["schools"], queryFn: () => firebaseClient.entities.School.list("-created_date", 1000) });
+  const { data: dropdownOptions = DEFAULT_DROPDOWN_OPTIONS } = useQuery({ queryKey: DROPDOWN_OPTIONS_QUERY_KEY, queryFn: getDropdownOptions });
 
   const loading = l1 || l2 || l3 || l4 || l5;
+  const reportClientStatuses = uniqueOptions(dropdownOptions.report_client_statuses || []);
+  const reportRevenueMetrics = uniqueOptions(dropdownOptions.report_revenue_metrics || []);
+  const reportPlacementGroupings = uniqueOptions(dropdownOptions.report_placement_groupings || []);
 
   const clientsByStatus = useMemo(
-    () => CLIENT_STATUSES.map((s) => ({ name: s, count: clients.filter((c) => c.status === s).length })),
-    [clients]
+    () => reportClientStatuses.map((s) => ({ name: s, count: clients.filter((c) => c.status === s).length })),
+    [clients, reportClientStatuses]
   );
 
   const apptsByMonth = useMemo(() => {
@@ -56,8 +79,11 @@ export default function Reports() {
     const billed = billing.filter((b) => b.billing_status !== "Not Billed" && b.billing_status !== "Waived").reduce((s, b) => s + (Number(b.amount) || 0), 0);
     const paid = billing.filter((b) => b.billing_status === "Paid").reduce((s, b) => s + (Number(b.amount) || 0), 0);
     const outstanding = billing.filter((b) => b.billing_status === "Invoice Sent" || b.billing_status === "Partially Paid").reduce((s, b) => s + (Number(b.amount) || 0), 0);
-    return [{ name: "Billed", value: billed }, { name: "Paid", value: paid }, { name: "Outstanding", value: outstanding }];
-  }, [billing]);
+    const metrics = { Billed: billed, Paid: paid, Outstanding: outstanding };
+    return reportRevenueMetrics
+      .filter((metric) => Object.prototype.hasOwnProperty.call(metrics, metric))
+      .map((metric) => ({ name: metric, value: metrics[metric] }));
+  }, [billing, reportRevenueMetrics]);
 
   const evaluatorWorkload = useMemo(() => {
     const map = {};
@@ -68,15 +94,21 @@ export default function Reports() {
     return Object.entries(map).map(([name, count]) => ({ name, count }));
   }, [evaluations]);
 
-  const placementsByHashkafa = useMemo(() => {
-    const schoolMap = Object.fromEntries(schools.map((s) => [s.id, s.hashkafa || "Other"]));
-    const map = {};
-    placements.forEach((p) => {
-      const h = schoolMap[p.school_id] || "Other";
-      map[h] = (map[h] || 0) + 1;
+  const placementReports = useMemo(() => {
+    const schoolMap = Object.fromEntries(schools.map((school) => [school.id, school]));
+    return reportPlacementGroupings.map((grouping) => {
+      const map = {};
+      placements.forEach((placement) => {
+        const school = schoolMap[placement.school_id];
+        const name = placementGroupingValue(placement, school, grouping);
+        map[name] = (map[name] || 0) + 1;
+      });
+      return {
+        grouping,
+        data: Object.entries(map).map(([name, value]) => ({ name, value })),
+      };
     });
-    return Object.entries(map).map(([name, value]) => ({ name, value }));
-  }, [placements, schools]);
+  }, [placements, reportPlacementGroupings, schools]);
 
   if (loading) {
     return (
@@ -139,15 +171,17 @@ export default function Reports() {
           </BarChart>
         </ChartCard>
 
-        <ChartCard title="Placements by Hashkafa">
-          <PieChart>
-            <Pie data={placementsByHashkafa} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} label>
-              {placementsByHashkafa.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-            </Pie>
-            <Tooltip />
-            <Legend />
-          </PieChart>
-        </ChartCard>
+        {placementReports.map((report) => (
+          <ChartCard key={report.grouping} title={`Placements by ${report.grouping}`}>
+            <PieChart>
+              <Pie data={report.data} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} label>
+                {report.data.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+              </Pie>
+              <Tooltip />
+              <Legend />
+            </PieChart>
+          </ChartCard>
+        ))}
       </div>
     </div>
   );

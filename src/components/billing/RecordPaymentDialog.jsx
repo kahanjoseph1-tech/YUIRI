@@ -4,7 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PAYMENT_METHODS } from "@/lib/constants";
+import { useQuery } from "@tanstack/react-query";
+import {
+  DEFAULT_DROPDOWN_OPTIONS,
+  DROPDOWN_OPTIONS_QUERY_KEY,
+  getDropdownOptions,
+  uniqueOptions,
+} from "@/lib/dropdownSettings";
 import { computePaymentStatus } from "@/lib/automations";
 import { fmtCurrency } from "@/lib/format";
 
@@ -14,6 +20,11 @@ export default function RecordPaymentDialog({ open, onOpenChange, record, onSave
   const [method, setMethod] = useState("");
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const { data: dropdownOptions = DEFAULT_DROPDOWN_OPTIONS } = useQuery({
+    queryKey: DROPDOWN_OPTIONS_QUERY_KEY,
+    queryFn: getDropdownOptions,
+  });
 
   useEffect(() => {
     if (open) {
@@ -30,6 +41,7 @@ export default function RecordPaymentDialog({ open, onOpenChange, record, onSave
   const receivedAmount = Number(paymentAmount || 0);
   const totalPaid = previousPaid + receivedAmount;
   const nextStatus = computePaymentStatus(amountDue, totalPaid);
+  const paymentMethodOptions = uniqueOptions([...(dropdownOptions.payment_methods || []), method]);
 
   const handleSave = async () => {
     if (receivedAmount <= 0) return;
@@ -81,7 +93,7 @@ export default function RecordPaymentDialog({ open, onOpenChange, record, onSave
             <Label className="text-xs font-medium text-gray-500">Payment Method</Label>
             <Select value={method} onValueChange={setMethod}>
               <SelectTrigger><SelectValue placeholder="Select method" /></SelectTrigger>
-              <SelectContent>{PAYMENT_METHODS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
+              <SelectContent>{paymentMethodOptions.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="space-y-1.5">

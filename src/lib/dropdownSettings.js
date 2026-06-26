@@ -7,6 +7,7 @@ import {
   DEFAULT_CALLER_OPTIONS,
   DEFAULT_RESPONSIBLE_OPTIONS,
   ENVIRONMENT_TYPES,
+  GRADE_LEVELS,
   MEETING_TYPES,
   PAYMENT_METHODS,
   PHONE_NUMBER_TAGS,
@@ -37,6 +38,17 @@ const DEFAULT_EVALUATION_BILLING_ANSWERS = ["געברענגט געלט", "דאר
 const DEFAULT_KEY_POINT_ZICHT_FAR_OPTIONS = ["Yeshiva Ketana", "Mesivta", "Beis Medrash", "Special Education", "Other"];
 const DEFAULT_KEY_POINT_SHIUR_OPTIONS = [];
 const DEFAULT_KEY_POINT_STYLE_OPTIONS = ["Chassidish", "Yeshivish", "Structured", "Warm/Nurturing", "Other"];
+
+const DEFAULT_YESHIVA_GRADE_RANGES = ["Pre-1A - 8th", "9th - 12th", "Beis Medrash", "Special Education", ...GRADE_LEVELS];
+const DEFAULT_YESHIVA_APPLICATION_TEXTS = ["Open Application", "Application", "Apply Online", "School Application"];
+const DEFAULT_YESHIVA_INFORMATION_TEXTS = ["School Information", "Information", "Yeshiva Details", "Info Sheet"];
+
+const DEFAULT_FINANCIAL_TRANSACTION_TYPES = ["Income", "Expense", "Payroll"];
+const DEFAULT_FINANCIAL_INCOME_CATEGORIES = ["Client Payment", "Evaluation", "Yeshiva Placement", "Consulting", "Other Income"];
+const DEFAULT_FINANCIAL_EXPENSE_CATEGORIES = ["Office", "Rent", "Supplies", "Travel", "Software", "Professional Fees", "Other Expense"];
+const DEFAULT_FINANCIAL_PAYROLL_CATEGORIES = ["Payroll", "Contractor", "Bonus", "Payroll Tax"];
+const DEFAULT_REPORT_REVENUE_METRICS = ["Billed", "Paid", "Outstanding"];
+const DEFAULT_REPORT_PLACEMENT_GROUPINGS = ["Hashkafa", "Yeshiva Type", "Environment Type", "Location"];
 
 export const DROPDOWN_SECTIONS = [
   {
@@ -93,6 +105,11 @@ export const DROPDOWN_SECTIONS = [
       "yeshiva_hashkafas",
       "yeshiva_types",
       "yeshiva_environment_types",
+      "yeshiva_grade_ranges",
+      "yeshiva_locations",
+      "yeshiva_specialties",
+      "yeshiva_application_texts",
+      "yeshiva_information_texts",
     ],
   },
   {
@@ -109,6 +126,26 @@ export const DROPDOWN_SECTIONS = [
       "billing_service_types",
       "billing_statuses",
       "payment_methods",
+    ],
+  },
+  {
+    key: "financials",
+    label: "Financials",
+    groupKeys: [
+      "financial_transaction_types",
+      "financial_income_categories",
+      "financial_expense_categories",
+      "financial_payroll_categories",
+      "payment_methods",
+    ],
+  },
+  {
+    key: "reports",
+    label: "Reports",
+    groupKeys: [
+      "report_client_statuses",
+      "report_revenue_metrics",
+      "report_placement_groupings",
     ],
   },
 ];
@@ -157,10 +194,23 @@ DROPDOWN_GROUPS.push(
   { key: "yeshiva_hashkafas", label: "Hashkafa", section: "yeshivas" },
   { key: "yeshiva_types", label: "Yeshiva type", section: "yeshivas" },
   { key: "yeshiva_environment_types", label: "Environment type", section: "yeshivas" },
+  { key: "yeshiva_grade_ranges", label: "Grade ranges", section: "yeshivas" },
+  { key: "yeshiva_locations", label: "Locations / cities", section: "yeshivas" },
+  { key: "yeshiva_specialties", label: "Specialties", section: "yeshivas" },
+  { key: "yeshiva_application_texts", label: "Application button text", section: "yeshivas" },
+  { key: "yeshiva_information_texts", label: "Information button text", section: "yeshivas" },
   { key: "placement_statuses", label: "Placement status", section: "placements" },
   { key: "billing_service_types", label: "Service type", section: "billing" },
   { key: "billing_statuses", label: "Billing status", section: "billing" },
   { key: "payment_methods", label: "Payment method", section: "billing" },
+  { key: "financial_transaction_types", label: "Transaction types", section: "financials" },
+  { key: "financial_income_categories", label: "Income categories", section: "financials" },
+  { key: "financial_expense_categories", label: "Expense categories", section: "financials" },
+  { key: "financial_payroll_categories", label: "Payroll categories", section: "financials" },
+  { key: "payment_methods", label: "Payment methods", section: "financials" },
+  { key: "report_client_statuses", label: "Client statuses in reports", section: "reports" },
+  { key: "report_revenue_metrics", label: "Revenue metrics", section: "reports" },
+  { key: "report_placement_groupings", label: "Placement grouping options", section: "reports" },
 );
 
 export const DEFAULT_DROPDOWN_OPTIONS = {
@@ -196,10 +246,22 @@ export const DEFAULT_DROPDOWN_OPTIONS = {
   yeshiva_hashkafas: SCHOOL_HASHKAFAS,
   yeshiva_types: SCHOOL_TYPES,
   yeshiva_environment_types: ENVIRONMENT_TYPES,
+  yeshiva_grade_ranges: DEFAULT_YESHIVA_GRADE_RANGES,
+  yeshiva_locations: [],
+  yeshiva_specialties: [],
+  yeshiva_application_texts: DEFAULT_YESHIVA_APPLICATION_TEXTS,
+  yeshiva_information_texts: DEFAULT_YESHIVA_INFORMATION_TEXTS,
   placement_statuses: PLACEMENT_STATUSES,
   billing_service_types: SERVICE_TYPES,
   billing_statuses: BILLING_STATUSES,
   payment_methods: PAYMENT_METHODS,
+  financial_transaction_types: DEFAULT_FINANCIAL_TRANSACTION_TYPES,
+  financial_income_categories: DEFAULT_FINANCIAL_INCOME_CATEGORIES,
+  financial_expense_categories: DEFAULT_FINANCIAL_EXPENSE_CATEGORIES,
+  financial_payroll_categories: DEFAULT_FINANCIAL_PAYROLL_CATEGORIES,
+  report_client_statuses: CLIENT_STATUSES,
+  report_revenue_metrics: DEFAULT_REPORT_REVENUE_METRICS,
+  report_placement_groupings: DEFAULT_REPORT_PLACEMENT_GROUPINGS,
 };
 
 export function uniqueOptions(options) {

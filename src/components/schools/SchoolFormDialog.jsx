@@ -53,6 +53,22 @@ export default function SchoolFormDialog({ open, onOpenChange, school, onSave })
     () => uniqueOptions([...(dropdownOptions.yeshiva_environment_types || []), form.environment_type]),
     [dropdownOptions.yeshiva_environment_types, form.environment_type]
   );
+  const gradeRangeOptions = useMemo(
+    () => uniqueOptions([...(dropdownOptions.yeshiva_grade_ranges || []), form.grade_range]),
+    [dropdownOptions.yeshiva_grade_ranges, form.grade_range]
+  );
+  const locationOptions = useMemo(
+    () => uniqueOptions([...(dropdownOptions.yeshiva_locations || []), form.location]),
+    [dropdownOptions.yeshiva_locations, form.location]
+  );
+  const applicationTextOptions = useMemo(
+    () => uniqueOptions([...(dropdownOptions.yeshiva_application_texts || []), form.application_text]),
+    [dropdownOptions.yeshiva_application_texts, form.application_text]
+  );
+  const informationTextOptions = useMemo(
+    () => uniqueOptions([...(dropdownOptions.yeshiva_information_texts || []), form.information_text]),
+    [dropdownOptions.yeshiva_information_texts, form.information_text]
+  );
 
   useEffect(() => {
     if (open) {
@@ -107,10 +123,28 @@ export default function SchoolFormDialog({ open, onOpenChange, school, onSave })
             </Select>
           </Field>
           <Field label="Location (City/Area)">
-            <Input value={form.location} onChange={(e) => update("location", e.target.value)} />
+            <div className="grid grid-cols-1 gap-2">
+              <Select value={locationOptions.includes(form.location) ? form.location : "__custom__"} onValueChange={(v) => update("location", v === "__custom__" ? "" : v)}>
+                <SelectTrigger><SelectValue placeholder="Select location" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__custom__">Custom</SelectItem>
+                  {locationOptions.map((location) => <SelectItem key={location} value={location}>{location}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Input value={form.location} onChange={(e) => update("location", e.target.value)} placeholder="City / area" />
+            </div>
           </Field>
           <Field label="Grade Range">
-            <Input value={form.grade_range} onChange={(e) => update("grade_range", e.target.value)} placeholder="e.g. 1st - 8th" />
+            <div className="grid grid-cols-1 gap-2">
+              <Select value={gradeRangeOptions.includes(form.grade_range) ? form.grade_range : "__custom__"} onValueChange={(v) => update("grade_range", v === "__custom__" ? "" : v)}>
+                <SelectTrigger><SelectValue placeholder="Select grades" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__custom__">Custom</SelectItem>
+                  {gradeRangeOptions.map((gradeRange) => <SelectItem key={gradeRange} value={gradeRange}>{gradeRange}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Input value={form.grade_range} onChange={(e) => update("grade_range", e.target.value)} placeholder="e.g. 9th - 12th" />
+            </div>
           </Field>
           <Field label="Address" full>
             <Input value={form.address} onChange={(e) => update("address", e.target.value)} />
@@ -131,12 +165,26 @@ export default function SchoolFormDialog({ open, onOpenChange, school, onSave })
             <Input value={form.application_url || ""} onChange={(e) => update("application_url", e.target.value)} placeholder="https://..." />
           </Field>
           <Field label="Application Button Text">
+            <Select value={applicationTextOptions.includes(form.application_text) ? form.application_text : "__custom__"} onValueChange={(v) => update("application_text", v === "__custom__" ? "" : v)}>
+              <SelectTrigger><SelectValue placeholder="Application" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__custom__">Custom</SelectItem>
+                {applicationTextOptions.map((label) => <SelectItem key={label} value={label}>{label}</SelectItem>)}
+              </SelectContent>
+            </Select>
             <Input value={form.application_text || ""} onChange={(e) => update("application_text", e.target.value)} placeholder="Application" />
           </Field>
           <Field label="Information Link">
             <Input value={form.information_url || ""} onChange={(e) => update("information_url", e.target.value)} placeholder="https://..." />
           </Field>
           <Field label="Information Button Text">
+            <Select value={informationTextOptions.includes(form.information_text) ? form.information_text : "__custom__"} onValueChange={(v) => update("information_text", v === "__custom__" ? "" : v)}>
+              <SelectTrigger><SelectValue placeholder="Information" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__custom__">Custom</SelectItem>
+                {informationTextOptions.map((label) => <SelectItem key={label} value={label}>{label}</SelectItem>)}
+              </SelectContent>
+            </Select>
             <Input value={form.information_text || ""} onChange={(e) => update("information_text", e.target.value)} placeholder="Information" />
           </Field>
           <Field label="Tuition Range">

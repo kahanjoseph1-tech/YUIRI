@@ -11,7 +11,12 @@ import { Plus, ArrowRightLeft } from "lucide-react";
 import StatusBadge from "@/components/StatusBadge";
 import MatchClientDialog from "@/components/placements/MatchClientDialog";
 import PlacementFormDialog from "@/components/placements/PlacementFormDialog";
-import { PLACEMENT_STATUSES } from "@/lib/constants";
+import {
+  DEFAULT_DROPDOWN_OPTIONS,
+  DROPDOWN_OPTIONS_QUERY_KEY,
+  getDropdownOptions,
+  uniqueOptions,
+} from "@/lib/dropdownSettings";
 import { onPlacementEnrolled } from "@/lib/automations";
 import { can } from "@/lib/roles";
 import { useRole } from "@/lib/useRole";
@@ -84,6 +89,10 @@ export default function Placements() {
   const { data: schools = [] } = useQuery({
     queryKey: ["schools"], queryFn: () => firebaseClient.entities.School.list("-created_date", 1000),
   });
+  const { data: dropdownOptions = DEFAULT_DROPDOWN_OPTIONS } = useQuery({
+    queryKey: DROPDOWN_OPTIONS_QUERY_KEY,
+    queryFn: getDropdownOptions,
+  });
 
   const createMutation = useMutation({
     mutationFn: (data) => firebaseClient.entities.Placement.create(data),
@@ -122,6 +131,7 @@ export default function Placements() {
 
   const visible = statusFilter === "all" ? placements : placements.filter((p) => p.status === statusFilter);
   const groupedVisible = useMemo(() => groupedPlacementRows(visible), [visible]);
+  const placementStatusOptions = uniqueOptions([...(dropdownOptions.placement_statuses || []), statusFilter === "all" ? "" : statusFilter]);
 
   return (
     <div className="space-y-6">
@@ -144,7 +154,7 @@ export default function Placements() {
           <SelectTrigger className="w-44"><SelectValue placeholder="Status" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Statuses</SelectItem>
-            {PLACEMENT_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+            {placementStatusOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>

@@ -12,18 +12,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import Combobox from "@/components/common/Combobox";
-import { PAYMENT_METHODS } from "@/lib/constants";
+import {
+  DEFAULT_DROPDOWN_OPTIONS,
+  DROPDOWN_OPTIONS_QUERY_KEY,
+  getDropdownOptions,
+  uniqueOptions,
+} from "@/lib/dropdownSettings";
 import { can } from "@/lib/roles";
 import { useRole } from "@/lib/useRole";
 import { fmtCurrency, fmtDate } from "@/lib/format";
 import { BadgeDollarSign, BriefcaseBusiness, CircleDollarSign, Pencil, Plus, ReceiptText, Trash2, TrendingDown, TrendingUp } from "lucide-react";
-
-const TYPES = ["Income", "Expense", "Payroll"];
-const CATEGORIES = {
-  Income: ["Client Payment", "Evaluation", "Yeshiva Placement", "Consulting", "Other Income"],
-  Expense: ["Office", "Rent", "Supplies", "Travel", "Software", "Professional Fees", "Other Expense"],
-  Payroll: ["Payroll", "Contractor", "Bonus", "Payroll Tax"],
-};
 
 function todayKey() {
   return new Date().toISOString().slice(0, 10);
@@ -93,6 +91,20 @@ function TransactionDialog({ open, onOpenChange, transaction, clients, onSave })
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
 
+  const { data: dropdownOptions = DEFAULT_DROPDOWN_OPTIONS } = useQuery({
+    queryKey: DROPDOWN_OPTIONS_QUERY_KEY,
+    queryFn: getDropdownOptions,
+  });
+
+  const categoryOptionsForType = (type, currentCategory = "") => {
+    const groupKey = type === "Income"
+      ? "financial_income_categories"
+      : type === "Payroll"
+        ? "financial_payroll_categories"
+        : "financial_expense_categories";
+    return uniqueOptions([...(dropdownOptions[groupKey] || []), currentCategory]);
+  };
+
   useEffect(() => {
     if (!open) return;
     setForm(transaction || {
@@ -108,14 +120,16 @@ function TransactionDialog({ open, onOpenChange, transaction, clients, onSave })
     setForm((previous) => {
       const next = { ...previous, [field]: value };
       if (field === "transaction_type") {
-        next.category = CATEGORIES[value]?.[0] || "";
+        next.category = categoryOptionsForType(value)[0] || "";
       }
       return next;
     });
   };
 
   const clientOptions = clients.map((client) => ({ value: client.id, label: clientName(client) }));
-  const categories = CATEGORIES[form.transaction_type] || [];
+  const typeOptions = uniqueOptions([...(dropdownOptions.financial_transaction_types || []), form.transaction_type]);
+  const categories = categoryOptionsForType(form.transaction_type, form.category);
+  const paymentMethodOptions = uniqueOptions([...(dropdownOptions.payment_methods || []), form.payment_method]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -147,7 +161,7 @@ function TransactionDialog({ open, onOpenChange, transaction, clients, onSave })
               <Label className="text-xs font-medium text-gray-500">Type</Label>
               <Select value={form.transaction_type || ""} onValueChange={(value) => update("transaction_type", value)}>
                 <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
-                <SelectContent>{TYPES.map((type) => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent>
+                <SelectContent>{typeOptions.map((type) => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
@@ -183,7 +197,7 @@ function TransactionDialog({ open, onOpenChange, transaction, clients, onSave })
               <Label className="text-xs font-medium text-gray-500">Payment Method</Label>
               <Select value={form.payment_method || ""} onValueChange={(value) => update("payment_method", value)}>
                 <SelectTrigger><SelectValue placeholder="Optional method" /></SelectTrigger>
-                <SelectContent>{PAYMENT_METHODS.map((method) => <SelectItem key={method} value={method}>{method}</SelectItem>)}</SelectContent>
+                <SelectContent>{paymentMethodOptions.map((method) => <SelectItem key={method} value={method}>{method}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           </div>

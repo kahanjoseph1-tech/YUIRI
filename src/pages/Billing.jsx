@@ -11,7 +11,12 @@ import StatusBadge from "@/components/StatusBadge";
 import BillingFormDialog from "@/components/billing/BillingFormDialog";
 import InvoiceDialog from "@/components/billing/InvoiceDialog";
 import RecordPaymentDialog from "@/components/billing/RecordPaymentDialog";
-import { BILLING_STATUSES } from "@/lib/constants";
+import {
+  DEFAULT_DROPDOWN_OPTIONS,
+  DROPDOWN_OPTIONS_QUERY_KEY,
+  getDropdownOptions,
+  uniqueOptions,
+} from "@/lib/dropdownSettings";
 import {
   nextInvoiceNumber,
   recordFinancialTransactionForBillingPayment,
@@ -37,6 +42,10 @@ export default function Billing() {
   });
   const { data: clients = [] } = useQuery({
     queryKey: ["clients"], queryFn: () => firebaseClient.entities.Client.list("-created_date", 1000),
+  });
+  const { data: dropdownOptions = DEFAULT_DROPDOWN_OPTIONS } = useQuery({
+    queryKey: DROPDOWN_OPTIONS_QUERY_KEY,
+    queryFn: getDropdownOptions,
   });
 
   const invalidate = () => {
@@ -106,6 +115,7 @@ export default function Billing() {
     );
 
   const visible = statusFilter === "all" ? billing : billing.filter((b) => b.billing_status === statusFilter);
+  const billingStatusOptions = uniqueOptions([...(dropdownOptions.billing_statuses || []), statusFilter === "all" ? "" : statusFilter]);
 
   const outstanding = billing
     .filter((b) => b.billing_status === "Invoice Sent" || b.billing_status === "Partially Paid")
@@ -144,7 +154,7 @@ export default function Billing() {
           <SelectTrigger className="w-44"><SelectValue placeholder="Status" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Statuses</SelectItem>
-            {BILLING_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+            {billingStatusOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
