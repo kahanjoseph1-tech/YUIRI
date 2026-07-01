@@ -33,6 +33,18 @@ function StatCard({ to, title, value, icon: Icon, color }) {
   );
 }
 
+function localDateKey(value) {
+  const date = toDate(value);
+  if (!date) return "";
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function isActiveAppointment(appointment) {
+  return !["Cancelled", "Completed", "No Show"].includes(appointment.status);
+}
+
 export default function Dashboard() {
   const queryClient = useQueryClient();
   const { canAccessPage } = useRole();
@@ -85,12 +97,16 @@ export default function Dashboard() {
 
   const newClients = clients.filter((c) => c.status === "New Client").length;
   const now = new Date();
-  const in7 = new Date(now.getTime() + 7 * 86400000);
-  const upcoming = appointments.filter((a) => {
+  const todayKey = localDateKey(now);
+  const scheduledEvaluations = appointments.filter((a) => {
     const d = toDate(a.date_time);
-    return !["Cancelled", "Completed", "No Show"].includes(a.status) && d && d >= now && d <= in7;
+    return (a.meeting_type || "Evaluation") === "Evaluation" && isActiveAppointment(a) && d && d >= now;
   }).length;
-  const pendingEvals = evaluations.filter((e) => e.status === "Pending" || e.status === "In Progress").length;
+  const todaysEvaluations = evaluations.filter((e) => {
+    const status = e.status || "Pending";
+    const evaluationDateKey = localDateKey(e.appointment_date || e.created_date);
+    return ["Pending", "In Progress", "Completed"].includes(status) && evaluationDateKey === todayKey;
+  }).length;
   const readyToBill = clients.filter((c) => c.ready_to_bill).length;
   const unpaidTotal = billing
     .filter((b) => b.billing_status === "Invoice Sent" || b.billing_status === "Partially Paid")
@@ -98,8 +114,8 @@ export default function Dashboard() {
 
   const cards = [
     { key: "Clients", to: `${createPageUrl("Clients")}?status=New%20Client`, title: "New Clients", value: newClients, icon: UserPlus, color: "blue" },
-    { key: "Appointments", to: createPageUrl("Appointments"), title: "Upcoming (7d)", value: upcoming, icon: CalendarClock, color: "amber" },
-    { key: "Evaluations", to: createPageUrl("Evaluations"), title: "Pending Evals", value: pendingEvals, icon: ClipboardList, color: "violet" },
+    { key: "Appointments", to: createPageUrl("Appointments"), title: "Scheduled Evaluations", value: scheduledEvaluations, icon: CalendarClock, color: "amber" },
+    { key: "Evaluations", to: createPageUrl("Evaluations"), title: "Today's Evaluations", value: todaysEvaluations, icon: ClipboardList, color: "violet" },
     { key: "Clients", to: `${createPageUrl("Clients")}?ready=1`, title: "Ready to Bill", value: readyToBill, icon: BadgeDollarSign, color: "emerald" },
     { key: "Billing", to: createPageUrl("Billing"), title: "Unpaid Invoices", value: fmtCurrency(unpaidTotal), icon: Receipt, color: "red" },
   ].filter((c) => canAccessPage(c.key));
