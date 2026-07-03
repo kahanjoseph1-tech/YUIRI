@@ -16,7 +16,6 @@ import Schools from './pages/Schools';
 import Placements from './pages/Placements';
 import Billing from './pages/Billing';
 import Financials from './pages/Financials';
-import Reports from './pages/Reports';
 import Users from './pages/Users';
 import Settings from './pages/Settings';
 import __Layout from './Layout.jsx';
@@ -33,7 +32,6 @@ export const PAGES = {
     "Placements": Placements,
     "Billing": Billing,
     "Financials": Financials,
-    "Reports": Reports,
     "Users": Users,
     "Settings": Settings,
 }

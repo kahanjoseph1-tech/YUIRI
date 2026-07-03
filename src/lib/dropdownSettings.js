@@ -47,8 +47,6 @@ const DEFAULT_FINANCIAL_TRANSACTION_TYPES = ["Income", "Expense", "Payroll"];
 const DEFAULT_FINANCIAL_INCOME_CATEGORIES = ["Client Payment", "Evaluation", "Yeshiva Placement", "Consulting", "Other Income"];
 const DEFAULT_FINANCIAL_EXPENSE_CATEGORIES = ["Office", "Rent", "Supplies", "Travel", "Software", "Professional Fees", "Other Expense"];
 const DEFAULT_FINANCIAL_PAYROLL_CATEGORIES = ["Payroll", "Contractor", "Bonus", "Payroll Tax"];
-const DEFAULT_REPORT_REVENUE_METRICS = ["Billed", "Paid", "Outstanding"];
-const DEFAULT_REPORT_PLACEMENT_GROUPINGS = ["Hashkafa", "Yeshiva Type", "Environment Type", "Location"];
 
 export const DROPDOWN_SECTIONS = [
   {
@@ -139,15 +137,6 @@ export const DROPDOWN_SECTIONS = [
       "payment_methods",
     ],
   },
-  {
-    key: "reports",
-    label: "Reports",
-    groupKeys: [
-      "report_client_statuses",
-      "report_revenue_metrics",
-      "report_placement_groupings",
-    ],
-  },
 ];
 
 export const DROPDOWN_GROUPS = [
@@ -208,9 +197,6 @@ DROPDOWN_GROUPS.push(
   { key: "financial_expense_categories", label: "Expense categories", section: "financials" },
   { key: "financial_payroll_categories", label: "Payroll categories", section: "financials" },
   { key: "payment_methods", label: "Payment methods", section: "financials" },
-  { key: "report_client_statuses", label: "Client statuses in reports", section: "reports" },
-  { key: "report_revenue_metrics", label: "Revenue metrics", section: "reports" },
-  { key: "report_placement_groupings", label: "Placement grouping options", section: "reports" },
 );
 
 export const DEFAULT_DROPDOWN_OPTIONS = {
@@ -259,9 +245,6 @@ export const DEFAULT_DROPDOWN_OPTIONS = {
   financial_income_categories: DEFAULT_FINANCIAL_INCOME_CATEGORIES,
   financial_expense_categories: DEFAULT_FINANCIAL_EXPENSE_CATEGORIES,
   financial_payroll_categories: DEFAULT_FINANCIAL_PAYROLL_CATEGORIES,
-  report_client_statuses: CLIENT_STATUSES,
-  report_revenue_metrics: DEFAULT_REPORT_REVENUE_METRICS,
-  report_placement_groupings: DEFAULT_REPORT_PLACEMENT_GROUPINGS,
 };
 
 export function uniqueOptions(options) {

@@ -18,10 +18,11 @@ import {
   getDropdownOptions,
   uniqueOptions,
 } from "@/lib/dropdownSettings";
+import { computePaymentStatus } from "@/lib/automations";
 import { can } from "@/lib/roles";
 import { useRole } from "@/lib/useRole";
 import { fmtCurrency, fmtDate } from "@/lib/format";
-import { BadgeDollarSign, BriefcaseBusiness, CircleDollarSign, Pencil, Plus, ReceiptText, Trash2, TrendingDown, TrendingUp } from "lucide-react";
+import { BadgeDollarSign, BriefcaseBusiness, CircleDollarSign, Pencil, Plus, ReceiptText, RotateCcw, Trash2, TrendingDown, TrendingUp } from "lucide-react";
 
 function todayKey() {
   return new Date().toISOString().slice(0, 10);
@@ -241,6 +242,7 @@ export default function Financials() {
   });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["financials"] });
+  const invalidateBilling = () => queryClient.invalidateQueries({ queryKey: ["billing"] });
 
   const createMutation = useMutation({
     mutationFn: (data) => firebaseClient.entities.FinancialTransaction.create(data),
@@ -256,6 +258,59 @@ export default function Financials() {
     mutationFn: (id) => firebaseClient.entities.FinancialTransaction.delete(id),
     onSuccess: () => { invalidate(); toast.success("Transaction deleted"); },
     onError: () => toast.error("Failed to delete transaction"),
+  });
+  const revertPaymentMutation = useMutation({
+    mutationFn: async (transaction) => {
+      if (transaction.source !== "Billing Payment") {
+        throw new Error("Only billing payments can be reverted.");
+      }
+
+      const paymentAmount = Number(transaction.amount || 0);
+      const billingRecordId = transaction.billing_record_id;
+
+      if (billingRecordId) {
+        let billingRecord = null;
+        try {
+          billingRecord = await firebaseClient.entities.BillingRecord.get(billingRecordId);
+        } catch {
+          const records = await firebaseClient.entities.BillingRecord.list("-created_date", 1000);
+          billingRecord = records.find((record) => record.id === billingRecordId) || null;
+        }
+
+        if (billingRecord) {
+          const currentPaid = Number(billingRecord.amount_paid || 0) ||
+            (billingRecord.billing_status === "Paid" ? Number(billingRecord.amount || 0) : 0);
+          const nextPaid = Math.max(0, currentPaid - paymentAmount);
+          const remainingPayments = transactions
+            .filter((record) =>
+              record.id !== transaction.id &&
+              record.source === "Billing Payment" &&
+              record.billing_record_id === billingRecordId
+            )
+            .sort((a, b) => new Date(b.transaction_date || b.created_date || 0) - new Date(a.transaction_date || a.created_date || 0));
+          const latestPayment = remainingPayments[0];
+
+          await firebaseClient.entities.BillingRecord.update(billingRecord.id, {
+            amount_paid: nextPaid,
+            billing_status: computePaymentStatus(Number(billingRecord.amount || 0), nextPaid),
+            paid_date: nextPaid >= Number(billingRecord.amount || 0) && Number(billingRecord.amount || 0) > 0
+              ? (latestPayment?.transaction_date || billingRecord.paid_date || "")
+              : "",
+            payment_date: latestPayment?.transaction_date || (nextPaid > 0 ? billingRecord.payment_date || "" : ""),
+            payment_method: latestPayment?.payment_method || (nextPaid > 0 ? billingRecord.payment_method || "" : ""),
+            payment_note: latestPayment?.notes || (nextPaid > 0 ? billingRecord.payment_note || "" : ""),
+          });
+        }
+      }
+
+      await firebaseClient.entities.FinancialTransaction.delete(transaction.id);
+    },
+    onSuccess: () => {
+      invalidate();
+      invalidateBilling();
+      toast.success("Payment reverted");
+    },
+    onError: (error) => toast.error(error?.message || "Failed to revert payment"),
   });
 
   const sortedTransactions = useMemo(
@@ -290,6 +345,16 @@ export default function Financials() {
   const saveTransaction = (data) => {
     if (editTransaction) return updateMutation.mutateAsync({ id: editTransaction.id, data });
     return createMutation.mutateAsync(data);
+  };
+
+  const handleDeleteTransaction = (transaction) => {
+    const confirmed = window.confirm(`Delete this ${transaction.transaction_type || "transaction"} for ${fmtCurrency(transaction.amount)}?`);
+    if (confirmed) deleteMutation.mutate(transaction.id);
+  };
+
+  const handleRevertPayment = (transaction) => {
+    const confirmed = window.confirm(`Revert this payment of ${fmtCurrency(transaction.amount)}? This will reduce the linked billing record balance.`);
+    if (confirmed) revertPaymentMutation.mutate(transaction);
   };
 
   return (
@@ -340,8 +405,8 @@ export default function Financials() {
                       <button
                         key={transaction.id}
                         type="button"
-                        disabled={!canWrite}
-                        onClick={() => canWrite && openEditTransaction(transaction)}
+                        disabled={!canWrite || transaction.source === "Billing Payment"}
+                        onClick={() => canWrite && transaction.source !== "Billing Payment" && openEditTransaction(transaction)}
                         className="flex w-full items-center justify-between gap-4 py-3 text-left hover:bg-gray-50 disabled:hover:bg-transparent"
                       >
                         <div className="min-w-0">
@@ -399,13 +464,25 @@ export default function Financials() {
                       {canWrite && (
                         <TableCell>
                           <div className="flex items-center justify-end gap-1">
-                            <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => openEditTransaction(transaction)}>
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            {transaction.source !== "Billing Payment" && (
-                              <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-red-600 hover:text-red-700" onClick={() => deleteMutation.mutate(transaction.id)}>
-                                <Trash2 className="h-4 w-4" />
+                            {transaction.source === "Billing Payment" ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 gap-1 text-amber-700 hover:text-amber-800"
+                                disabled={revertPaymentMutation.isPending}
+                                onClick={() => handleRevertPayment(transaction)}
+                              >
+                                <RotateCcw className="h-3.5 w-3.5" /> Revert Payment
                               </Button>
+                            ) : (
+                              <>
+                                <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => openEditTransaction(transaction)}>
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-red-600 hover:text-red-700" onClick={() => handleDeleteTransaction(transaction)}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </>
                             )}
                           </div>
                         </TableCell>

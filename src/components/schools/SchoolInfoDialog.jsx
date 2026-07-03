@@ -2,6 +2,7 @@ import React from "react";
 import { ExternalLink, FileText, Globe, Mail, MapPin, Phone } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import SchoolApplicationEmailBox from "@/components/schools/SchoolApplicationEmailBox";
 
 function Detail({ label, value }) {
   if (value == null || value === "") return null;
@@ -81,6 +82,8 @@ export default function SchoolInfoDialog({ open, onOpenChange, school }) {
               <LinkRow icon={FileText} href={school.application_url} label={school.application_text || "Application"} />
               <LinkRow icon={FileText} href={school.information_url} label={school.information_text || "Information"} />
             </div>
+
+            <SchoolApplicationEmailBox school={school} />
 
             {Array.isArray(school.specialties) && school.specialties.length > 0 && (
               <div>

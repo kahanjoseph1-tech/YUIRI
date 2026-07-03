@@ -302,13 +302,21 @@ function buildInvoiceMessage({ toEmail, senderEmail, fatherName, boyName, servic
 function buildApplicationLinksMessage({ toEmail, senderEmail, fatherName, boyName, schools }) {
   const fromName = senderDisplayName();
   const greetingName = fatherName || boyName || "there";
-  const subject = `Yeshiva applications${boyName ? ` for ${boyName}` : ""}`;
+  const hasClientName = Boolean(cleanString(boyName));
+  const subject = hasClientName
+    ? `Yeshiva applications for ${boyName}`
+    : schools.length === 1
+      ? `Yeshiva application - ${cleanString(schools[0]?.name, "Yeshiva")}`
+      : "Yeshiva application links";
+  const intro = hasClientName
+    ? `Please see below the recommended yeshivas and application links for ${boyName}.`
+    : "Please see below the yeshiva information and application link.";
   const boundary = `yuiri_application_${Date.now()}`;
 
   const textBody = [
     `Dear ${greetingName},`,
     "",
-    `Please see below the recommended yeshivas and application links for ${boyName || "your son"}.`,
+    intro,
     "",
     ...schools.flatMap((school, index) => [
       `${index + 1}. ${schoolTextBlock(school)}`,
@@ -329,7 +337,7 @@ function buildApplicationLinksMessage({ toEmail, senderEmail, fatherName, boyNam
         </div>
         <div style="padding:22px 24px">
           <p style="margin:0 0 12px">Dear <span dir="auto">${escapeHtml(greetingName)}</span>,</p>
-          <p style="margin:0 0 18px">Please see below the recommended yeshivas and application links for <strong dir="auto">${escapeHtml(boyName || "your son")}</strong>.</p>
+          <p style="margin:0 0 18px">${escapeHtml(intro)}</p>
           ${schools.map((school, index) => schoolHtmlBlock(school, index)).join("")}
           <p style="margin:20px 0 0">Please let me know if you have any questions or require any further information.</p>
           <p style="margin:18px 0 0">Best regards,<br><span dir="rtl">${escapeHtml(fromName)}</span></p>
@@ -454,8 +462,9 @@ export const sendApplicationLinksEmail = onCall(
     const authUser = await requireApprovedUser(request.auth?.uid);
     const data = request.data || {};
     const toEmail = validateEmail(data.toEmail);
-    const client = await readOptionalDocument("clients", data.clientId);
-    if (!client) throw new HttpsError("not-found", "Client was not found.");
+    const clientId = cleanString(data.clientId);
+    const client = clientId ? await readOptionalDocument("clients", clientId) : null;
+    if (clientId && !client) throw new HttpsError("not-found", "Client was not found.");
 
     const schoolIds = Array.isArray(data.schoolIds) ? data.schoolIds.map(cleanString).filter(Boolean) : [];
     if (schoolIds.length === 0) {
@@ -471,9 +480,18 @@ export const sendApplicationLinksEmail = onCall(
       throw new HttpsError("invalid-argument", "No yeshivas were found for this email.");
     }
 
+    const missingApplicationSchools = schools.filter((school) => !cleanString(school.application_url));
+    if (missingApplicationSchools.length > 0) {
+      throw new HttpsError(
+        "failed-precondition",
+        `Add an application link before sending: ${missingApplicationSchools.map((school) => cleanString(school.name, "Yeshiva")).join(", ")}.`,
+      );
+    }
+
     const senderEmail = validateEmail(GMAIL_SENDER_EMAIL.value());
-    const boyName = cleanString(data.clientName || `${client.boy_first_name || ""} ${client.boy_last_name || ""}`, "Client");
-    const fatherName = cleanString(data.fatherName || client.father_name);
+    const clientFullName = client ? `${client.boy_first_name || ""} ${client.boy_last_name || ""}` : "";
+    const boyName = cleanString(data.clientName || clientFullName);
+    const fatherName = cleanString(data.fatherName || client?.father_name || data.recipientName);
     const rawMessage = buildApplicationLinksMessage({
       toEmail,
       senderEmail,
@@ -491,7 +509,7 @@ export const sendApplicationLinksEmail = onCall(
       from_email: senderEmail,
       message_id: gmailResult.id || "",
       thread_id: gmailResult.threadId || "",
-      client_id: client.id,
+      client_id: client?.id || "",
       client_name: boyName,
       school_ids: schools.map((school) => school.id),
       school_names: schools.map((school) => school.name || "Yeshiva"),
@@ -503,15 +521,17 @@ export const sendApplicationLinksEmail = onCall(
     };
 
     await db.collection("email_logs").add(log);
-    await db.collection("clients").doc(client.id).set(
-      {
-        application_links_email_sent_at: sentAt,
-        application_links_email_to: toEmail,
-        application_links_email_school_ids: log.school_ids,
-        updated_date: sentAt,
-      },
-      { merge: true },
-    );
+    if (client?.id) {
+      await db.collection("clients").doc(client.id).set(
+        {
+          application_links_email_sent_at: sentAt,
+          application_links_email_to: toEmail,
+          application_links_email_school_ids: log.school_ids,
+          updated_date: sentAt,
+        },
+        { merge: true },
+      );
+    }
 
     return {
       sent: true,

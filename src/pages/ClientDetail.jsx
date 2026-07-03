@@ -329,6 +329,7 @@ export default function ClientDetail() {
   const [finalSchoolId, setFinalSchoolId] = useState("");
   const [applicationEmailOpen, setApplicationEmailOpen] = useState(false);
   const [schoolInfoOpen, setSchoolInfoOpen] = useState(false);
+  const [selectedSchoolInfo, setSelectedSchoolInfo] = useState(null);
 
   const { data: clients = [], isLoading } = useQuery({
     queryKey: ["clients"], queryFn: () => firebaseClient.entities.Client.list("-created_date", 1000),
@@ -361,6 +362,12 @@ export default function ClientDetail() {
       schools.find((school) => school.name && school.name === client.current_school) ||
       null
     : null;
+
+  const openSchoolInfo = (school) => {
+    if (!school) return;
+    setSelectedSchoolInfo(school);
+    setSchoolInfoOpen(true);
+  };
 
   const updateMutation = useMutation({
     mutationFn: ({ data }) => firebaseClient.entities.Client.update(id, data),
@@ -820,7 +827,7 @@ export default function ClientDetail() {
               icon={GraduationCap}
               label="לערנט בישיבה"
               value={client.current_school}
-              onClick={currentSchool ? () => setSchoolInfoOpen(true) : undefined}
+              onClick={currentSchool ? () => openSchoolInfo(currentSchool) : undefined}
             />
             <InfoItem icon={GraduationCap} label="שיעור" value={client.shiur} />
             <InfoItem icon={UserRound} label="טאטע'ס נאמען" value={client.father_name} />
@@ -1013,29 +1020,43 @@ export default function ClientDetail() {
               </p>
             ) : (
               <div className="space-y-2">
-                {recommendationPlacements.map((placement) => (
-                  <div key={placement.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-gray-100 px-3 py-3">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-medium text-gray-900 truncate">{placement.school_name || "Yeshiva"}</p>
-                        <StatusBadge status={placement.status || "Recommended"} />
+                {recommendationPlacements.map((placement) => {
+                  const placementSchool = schools.find((school) => school.id === placement.school_id) ||
+                    schools.find((school) => school.name && school.name === placement.school_name);
+                  return (
+                    <div key={placement.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-gray-100 px-3 py-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {placementSchool ? (
+                            <button
+                              type="button"
+                              className="truncate text-left font-medium text-[#1e3a5f] hover:underline"
+                              onClick={() => openSchoolInfo(placementSchool)}
+                            >
+                              {placement.school_name || placementSchool.name || "Yeshiva"}
+                            </button>
+                          ) : (
+                            <p className="font-medium text-gray-900 truncate">{placement.school_name || "Yeshiva"}</p>
+                          )}
+                          <StatusBadge status={placement.status || "Recommended"} />
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1">
+                          {placement.recommended_date ? `Recommended ${fmtDate(placement.recommended_date)}` : "Recommendation"}
+                        </p>
                       </div>
-                      <p className="text-xs text-gray-400 mt-1">
-                        {placement.recommended_date ? `Recommended ${fmtDate(placement.recommended_date)}` : "Recommendation"}
-                      </p>
+                      {canPlace && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setFinalSchoolId(placement.school_id)}
+                        >
+                          Use as final
+                        </Button>
+                      )}
                     </div>
-                    {canPlace && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setFinalSchoolId(placement.school_id)}
-                      >
-                        Use as final
-                      </Button>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -1349,8 +1370,11 @@ export default function ClientDetail() {
       />
       <SchoolInfoDialog
         open={schoolInfoOpen}
-        onOpenChange={setSchoolInfoOpen}
-        school={currentSchool}
+        onOpenChange={(open) => {
+          setSchoolInfoOpen(open);
+          if (!open) setSelectedSchoolInfo(null);
+        }}
+        school={selectedSchoolInfo || currentSchool}
       />
     </div>
   );

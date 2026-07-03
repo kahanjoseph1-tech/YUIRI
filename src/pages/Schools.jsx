@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Search, GraduationCap, Pencil, MapPin, Phone, Mail, Globe, FileText, ExternalLink } from "lucide-react";
 import StatusBadge from "@/components/StatusBadge";
 import SchoolFormDialog from "@/components/schools/SchoolFormDialog";
+import SchoolApplicationEmailBox from "@/components/schools/SchoolApplicationEmailBox";
 import { SCHOOL_HASHKAFAS, SCHOOL_TYPES } from "@/lib/constants";
 import {
   DEFAULT_DROPDOWN_OPTIONS,
@@ -195,6 +196,8 @@ export default function Schools() {
                 {viewSchool.description && <p className="pt-2 border-t border-gray-50 whitespace-pre-wrap">{viewSchool.description}</p>}
                 {viewSchool.notes && viewSchool.notes !== viewSchool.description && <p className="pt-2 border-t border-gray-50 whitespace-pre-wrap">{viewSchool.notes}</p>}
               </div>
+
+              <SchoolApplicationEmailBox school={viewSchool} />
 
               <div className="pt-4 border-t border-gray-100">
                 <h3 className="font-semibold text-gray-900 mb-2">Placements at this yeshiva ({schoolPlacements.length})</h3>

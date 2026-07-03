@@ -47,6 +47,11 @@ export default function ApplicationLinksEmailDialog({ open, onOpenChange, client
     );
   };
 
+  const selectedSchools = recommendedSchools
+    .filter(({ school }) => selectedSchoolIds.includes(school.id))
+    .map(({ school }) => school);
+  const missingApplicationSchools = selectedSchools.filter((school) => !String(school.application_url || "").trim());
+
   const handleSend = async () => {
     const toEmail = recipient.trim();
     if (!toEmail) {
@@ -55,6 +60,10 @@ export default function ApplicationLinksEmailDialog({ open, onOpenChange, client
     }
     if (selectedSchoolIds.length === 0) {
       toast.error("Choose at least one yeshiva");
+      return;
+    }
+    if (missingApplicationSchools.length > 0) {
+      toast.error(`Add an application link before sending: ${missingApplicationSchools.map((school) => school.name || "Yeshiva").join(", ")}`);
       return;
     }
 
@@ -141,7 +150,7 @@ export default function ApplicationLinksEmailDialog({ open, onOpenChange, client
                           )}
                         </div>
                         {!hasApplicationLink && (
-                          <p className="mt-1 text-[11px] text-gray-400">It can still be sent, but add an application link in the Yeshiva record when available.</p>
+                          <p className="mt-1 text-[11px] font-medium text-red-600">Cannot send until this yeshiva has an application link.</p>
                         )}
                       </div>
                     </label>

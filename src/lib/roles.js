@@ -10,7 +10,7 @@ export function getEffectiveRole(user) {
 // Which page keys each role may open. ClientDetail follows Clients access.
 const CRM_PAGES = [
   "Dashboard", "Clients", "ClientDetail", "Appointments", "Evaluations",
-  "OpenCases", "Schools", "Placements", "Billing", "Financials", "Reports",
+  "OpenCases", "Schools", "Placements", "Billing", "Financials",
 ];
 
 const PAGE_ACCESS = {
@@ -53,7 +53,6 @@ export const NAV_ITEMS = [
   { key: "Placements", label: "Placements", icon: "ArrowRightLeft" },
   { key: "Billing", label: "Billing", icon: "DollarSign" },
   { key: "Financials", label: "Financials", icon: "BarChart3" },
-  { key: "Reports", label: "Reports", icon: "BarChart3" },
   { key: "Users", label: "Users", icon: "Users" },
   { key: "Settings", label: "Settings", icon: "Settings" },
 ];
