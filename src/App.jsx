@@ -1,6 +1,6 @@
 import { Toaster } from "@/components/ui/toaster"
 import { Toaster as SonnerToaster } from "@/components/ui/sonner"
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import { pagesConfig } from './pages.config'
@@ -20,16 +20,28 @@ const LayoutWrapper = ({ children, currentPageName }) => Layout ?
   <Layout currentPageName={currentPageName}>{children}</Layout>
   : <>{children}</>;
 
+function AppSpinner({ className = "min-h-[240px]" }) {
+  return (
+    <div className={`flex items-center justify-center ${className}`}>
+      <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
+    </div>
+  );
+}
+
+function PageShell({ Page }) {
+  return (
+    <Suspense fallback={<AppSpinner />}>
+      <Page />
+    </Suspense>
+  );
+}
+
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, isAuthenticated, authError, user } = useAuth();
 
   // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
-      </div>
-    );
+    return <AppSpinner className="fixed inset-0" />;
   }
 
   if (!isAuthenticated) {
@@ -46,7 +58,7 @@ const AuthenticatedApp = () => {
       <Route path="/" element={
         <RoleGate pageKey={mainPageKey}>
           <LayoutWrapper currentPageName={mainPageKey}>
-            <MainPage />
+            <PageShell Page={MainPage} />
           </LayoutWrapper>
         </RoleGate>
       } />
@@ -57,7 +69,7 @@ const AuthenticatedApp = () => {
           element={
             <RoleGate pageKey={path}>
               <LayoutWrapper currentPageName={path}>
-                <Page />
+                <PageShell Page={Page} />
               </LayoutWrapper>
             </RoleGate>
           }

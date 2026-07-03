@@ -17,7 +17,6 @@ import {
   invoicePaidAmount,
   primaryPhone,
 } from "@/lib/invoices";
-import { sendInvoiceEmail } from "@/lib/invoiceEmail";
 import { fmtCurrency, fmtDate, fmtDateTime } from "@/lib/format";
 
 export default function InvoiceDialog({ open, onOpenChange, record, client }) {
@@ -70,7 +69,7 @@ export default function InvoiceDialog({ open, onOpenChange, record, client }) {
       .then((doc) => {
         const dataUri = doc.output("datauristring");
         const attachmentBase64 = dataUri.split(",")[1] || "";
-        return sendInvoiceEmail({
+        return import("@/lib/invoiceEmail").then(({ sendInvoiceEmail }) => sendInvoiceEmail({
           toEmail: recipient,
           billingRecordId: record.id || "",
           clientId: client?.id || record.client_id || "",
@@ -80,7 +79,7 @@ export default function InvoiceDialog({ open, onOpenChange, record, client }) {
           clientName: clientDisplayName(client),
           attachmentFileName: invoiceFileName(record, client),
           attachmentBase64,
-        });
+        }));
       })
       .then(() => {
         toast.success(`Invoice email sent to ${recipient}`);

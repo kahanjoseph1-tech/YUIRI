@@ -6,34 +6,23 @@
  *
  * THE ONLY EDITABLE VALUE for the landing page is `mainPage`.
  */
-import Dashboard from './pages/Dashboard';
-import Clients from './pages/Clients';
-import ClientDetail from './pages/ClientDetail';
-import Appointments from './pages/Appointments';
-import Evaluations from './pages/Evaluations';
-import OpenCases from './pages/OpenCases';
-import Schools from './pages/Schools';
-import Placements from './pages/Placements';
-import Billing from './pages/Billing';
-import Financials from './pages/Financials';
-import Users from './pages/Users';
-import Settings from './pages/Settings';
+import { lazy } from 'react';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
-    "Dashboard": Dashboard,
-    "Clients": Clients,
-    "ClientDetail": ClientDetail,
-    "Appointments": Appointments,
-    "Evaluations": Evaluations,
-    "OpenCases": OpenCases,
-    "Schools": Schools,
-    "Placements": Placements,
-    "Billing": Billing,
-    "Financials": Financials,
-    "Users": Users,
-    "Settings": Settings,
+    "Dashboard": lazy(() => import('./pages/Dashboard')),
+    "Clients": lazy(() => import('./pages/Clients')),
+    "ClientDetail": lazy(() => import('./pages/ClientDetail')),
+    "Appointments": lazy(() => import('./pages/Appointments')),
+    "Evaluations": lazy(() => import('./pages/Evaluations')),
+    "OpenCases": lazy(() => import('./pages/OpenCases')),
+    "Schools": lazy(() => import('./pages/Schools')),
+    "Placements": lazy(() => import('./pages/Placements')),
+    "Billing": lazy(() => import('./pages/Billing')),
+    "Financials": lazy(() => import('./pages/Financials')),
+    "Users": lazy(() => import('./pages/Users')),
+    "Settings": lazy(() => import('./pages/Settings')),
 }
 
 export const pagesConfig = {

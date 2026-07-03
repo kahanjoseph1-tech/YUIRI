@@ -5,6 +5,9 @@ import {
   doc,
   getDoc,
   getDocs,
+  limit as firestoreLimit,
+  orderBy,
+  query as firestoreQuery,
   setDoc,
   updateDoc,
 } from "firebase/firestore";
@@ -497,7 +500,17 @@ function createEntity(entityName) {
 
   return {
     async list(sortSpec, limitCount) {
-      const snapshot = await getDocs(collection(db, collectionName));
+      const collectionRef = collection(db, collectionName);
+      const constraints = [];
+      if (sortSpec) {
+        const descending = sortSpec.startsWith("-");
+        constraints.push(orderBy(descending ? sortSpec.slice(1) : sortSpec, descending ? "desc" : "asc"));
+      }
+      if (limitCount) constraints.push(firestoreLimit(limitCount));
+
+      const snapshot = await getDocs(
+        constraints.length ? firestoreQuery(collectionRef, ...constraints) : collectionRef
+      );
       const rows = snapshot.docs.map((document) =>
         transformer.fromDb(document.id, document.data())
       );

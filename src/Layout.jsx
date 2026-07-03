@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQueries } from "@tanstack/react-query";
 import { createPageUrl } from "@/utils";
@@ -99,7 +99,30 @@ const COUNT_QUERIES = {
   },
 };
 
+function useDeferredCountsEnabled() {
+  const [enabled, setEnabled] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      setEnabled(true);
+      return undefined;
+    }
+
+    const start = () => setEnabled(true);
+    if ("requestIdleCallback" in window) {
+      const id = window.requestIdleCallback(start, { timeout: 2000 });
+      return () => window.cancelIdleCallback(id);
+    }
+
+    const id = window.setTimeout(start, 800);
+    return () => window.clearTimeout(id);
+  }, []);
+
+  return enabled;
+}
+
 function useSidebarCounts(navItems) {
+  const countsEnabled = useDeferredCountsEnabled();
   const countItems = navItems.filter((item) => COUNT_QUERIES[item.key]);
   const results = useQueries({
     queries: countItems.map((item) => {
@@ -107,6 +130,7 @@ function useSidebarCounts(navItems) {
       return {
         queryKey: config.queryKey,
         queryFn: config.queryFn,
+        enabled: countsEnabled,
         staleTime: 60_000,
         select: (rows = []) => (config.count ? config.count(rows) : rows.length),
       };
