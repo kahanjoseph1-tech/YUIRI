@@ -6,9 +6,8 @@ import {
 } from "@/lib/evaluationQuestions";
 import { DEFAULT_DROPDOWN_OPTIONS, uniqueOptions } from "@/lib/dropdownSettings";
 
-const PAGE_WIDTH = 528;
-const PAGE_HEIGHT = 816;
-const HALF_LETTER_SIZE = [396, 612];
+const PAGE_WIDTH = 816;
+const PAGE_HEIGHT = 1056;
 
 function element(tag, styles = {}, text = "") {
   const node = document.createElement(tag);
@@ -41,7 +40,7 @@ function addHeader(page, pageNumber) {
   const title = element("div", { textAlign: "right" });
   title.append(
     element("div", { color: "#0f172a", fontSize: "15px", fontWeight: "700" }, "Evaluation Worksheet"),
-    element("div", { color: "#64748b", fontSize: "8px", marginTop: "2px" }, `Half-letter worksheet - page ${pageNumber}`),
+    element("div", { color: "#64748b", fontSize: "8px", marginTop: "2px" }, "One-page worksheet"),
   );
   header.append(brand, title);
   page.append(header);
@@ -149,7 +148,7 @@ function createPage(container, pageNumber) {
     width: `${PAGE_WIDTH}px`,
     minHeight: `${PAGE_HEIGHT}px`,
     boxSizing: "border-box",
-    padding: "24px 26px 24px",
+    padding: "28px 32px 24px",
     background: "#ffffff",
     color: "#0f172a",
     fontFamily: "Arial, Helvetica, sans-serif",
@@ -165,9 +164,9 @@ function createPage(container, pageNumber) {
 function addFooter(page, pageNumber, pageCount) {
   page.append(element("footer", {
     position: "absolute",
-    bottom: "12px",
-    left: "26px",
-    right: "26px",
+    bottom: "16px",
+    left: "32px",
+    right: "32px",
     borderTop: "1px solid #e2e8f0",
     paddingTop: "5px",
     display: "flex",
@@ -186,24 +185,30 @@ function buildWorksheet(dropdownOptions) {
     zIndex: "-1",
   });
 
-  const pageOne = createPage(container, 1);
-  addSectionHeading(pageOne, "Key Points");
-  keyPointQuestions.forEach((question) => addChoiceQuestion(pageOne, question, dropdownOptions));
-  addSectionHeading(pageOne, "Evaluation");
-  singleChoiceQuestions.forEach((question) => addChoiceQuestion(pageOne, question, dropdownOptions));
-  checkboxQuestions.slice(0, 3).forEach((question) => addChoiceQuestion(pageOne, question, dropdownOptions));
+  const page = createPage(container, 1);
+  const columns = element("div", {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+    gap: "12px",
+    alignItems: "start",
+  });
+  const leftColumn = element("div");
+  const rightColumn = element("div");
+  columns.append(leftColumn, rightColumn);
+  page.append(columns);
 
-  const pageTwo = createPage(container, 2);
-  addSectionHeading(pageTwo, "Evaluation Continued");
-  checkboxQuestions.slice(3, 9).forEach((question) => addChoiceQuestion(pageTwo, question, dropdownOptions));
+  addSectionHeading(leftColumn, "Key Points");
+  keyPointQuestions.forEach((question) => addChoiceQuestion(leftColumn, question, dropdownOptions));
+  addSectionHeading(leftColumn, "Evaluation");
+  singleChoiceQuestions.forEach((question) => addChoiceQuestion(leftColumn, question, dropdownOptions));
+  checkboxQuestions.slice(0, 3).forEach((question) => addChoiceQuestion(leftColumn, question, dropdownOptions));
 
-  const pageThree = createPage(container, 3);
-  addSectionHeading(pageThree, "Evaluation Continued");
-  checkboxQuestions.slice(9).forEach((question) => addChoiceQuestion(pageThree, question, dropdownOptions));
-  addSectionHeading(pageThree, "Detailed Answers");
-  longAnswerQuestions.forEach((question) => addLongAnswerQuestion(pageThree, question));
+  addSectionHeading(rightColumn, "Evaluation Continued");
+  checkboxQuestions.slice(3).forEach((question) => addChoiceQuestion(rightColumn, question, dropdownOptions));
+  addSectionHeading(rightColumn, "Detailed Answers");
+  longAnswerQuestions.forEach((question) => addLongAnswerQuestion(rightColumn, question));
 
-  [pageOne, pageTwo, pageThree].forEach((page, index) => addFooter(page, index + 1, 3));
+  addFooter(page, 1, 1);
   return container;
 }
 
@@ -220,7 +225,7 @@ export async function downloadBlankEvaluationSheet(dropdownOptions) {
       import("jspdf"),
     ]);
     const pages = Array.from(container.children);
-    const doc = new jsPDF({ unit: "pt", format: HALF_LETTER_SIZE });
+    const doc = new jsPDF({ unit: "pt", format: "letter" });
 
     for (let index = 0; index < pages.length; index += 1) {
       const canvas = await html2canvas(pages[index], {
@@ -229,7 +234,7 @@ export async function downloadBlankEvaluationSheet(dropdownOptions) {
         scale: 2,
         useCORS: true,
       });
-      if (index > 0) doc.addPage(HALF_LETTER_SIZE, "portrait");
+      if (index > 0) doc.addPage("letter", "portrait");
       doc.addImage(
         canvas.toDataURL("image/png"),
         "PNG",
