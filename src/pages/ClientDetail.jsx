@@ -126,11 +126,16 @@ function questionnaireAnswer(evaluation, key) {
   return other ? `${answer}${answer ? " - " : ""}${other}` : answer;
 }
 
+function questionnaireNote(evaluation, key, keyPoint = false) {
+  const noteGroup = keyPoint ? "key_point_notes" : "question_notes";
+  return evaluation?.questionnaire?.[noteGroup]?.[key] || "";
+}
+
 function keyPointRows(evaluation) {
   const keyPoints = evaluation?.key_points || {};
   return KEY_POINT_FIELDS
-    .map((field) => ({ ...field, value: keyPoints[field.key] || "" }))
-    .filter((field) => field.value);
+    .map((field) => ({ ...field, value: keyPoints[field.key] || "", note: questionnaireNote(evaluation, field.key, true) }))
+    .filter((field) => field.value || field.note);
 }
 
 function isoFromLocalInput(value) {
@@ -231,8 +236,8 @@ function billingSortDate(record) {
 
 function EvaluationCard({ evaluation, index, onAddFollowUp }) {
   const answers = QUESTION_FIELDS
-    .map((field) => ({ ...field, value: questionnaireAnswer(evaluation, field.key) }))
-    .filter((field) => field.value);
+    .map((field) => ({ ...field, value: questionnaireAnswer(evaluation, field.key), note: questionnaireNote(evaluation, field.key) }))
+    .filter((field) => field.value || field.note);
   const keyPoints = keyPointRows(evaluation);
 
   return (
@@ -276,7 +281,8 @@ function EvaluationCard({ evaluation, index, onAddFollowUp }) {
               {keyPoints.map((point) => (
                 <div key={point.key} className="rounded-lg bg-white border border-blue-100 px-3 py-2">
                   <p className="text-[11px] text-gray-400">{point.label}</p>
-                  <p className="text-sm font-semibold text-gray-900 mt-1">{point.value}</p>
+                  {point.value && <p className="text-sm font-semibold text-gray-900 mt-1">{point.value}</p>}
+                  {point.note && <p className="mt-1 text-xs text-gray-500 whitespace-pre-wrap">{point.note}</p>}
                 </div>
               ))}
             </div>
@@ -290,7 +296,13 @@ function EvaluationCard({ evaluation, index, onAddFollowUp }) {
             {answers.map((answer) => (
               <div key={answer.key} className="rounded-lg border border-gray-100 px-3 py-2">
                 <p className="text-xs text-gray-400" dir="rtl">{answer.label}</p>
-                <p className="text-sm font-medium text-gray-800 mt-1" dir="rtl">{answer.value}</p>
+                {answer.value && <p className="text-sm font-medium text-gray-800 mt-1" dir="rtl">{answer.value}</p>}
+                {answer.note && (
+                  <div className="mt-2 border-t border-gray-100 pt-2" dir="rtl">
+                    <p className="text-[11px] text-gray-400">נאטיצן</p>
+                    <p className="mt-1 text-sm text-gray-600 whitespace-pre-wrap">{answer.note}</p>
+                  </div>
+                )}
               </div>
             ))}
           </div>

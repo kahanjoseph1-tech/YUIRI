@@ -5,12 +5,14 @@ import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ClipboardList } from "lucide-react";
+import { ClipboardList, Download } from "lucide-react";
 import StatusBadge from "@/components/StatusBadge";
 import EvaluationFormDialog from "@/components/evaluations/EvaluationFormDialog";
 import { EVALUATION_STATUSES } from "@/lib/constants";
 import { onEvaluationCompleted, syncDueEvaluationAppointments } from "@/lib/automations";
 import { fmtDate, fmtDateTime } from "@/lib/format";
+import { DEFAULT_DROPDOWN_OPTIONS, DROPDOWN_OPTIONS_QUERY_KEY, getDropdownOptions } from "@/lib/dropdownSettings";
+import { downloadBlankEvaluationSheet } from "@/lib/evaluationSheet";
 
 function localDateKey(value) {
   const date = value ? new Date(value) : null;
@@ -34,6 +36,7 @@ export default function Evaluations() {
 
   const [statusFilter, setStatusFilter] = useState("open");
   const [active, setActive] = useState(null);
+  const [downloadingSheet, setDownloadingSheet] = useState(false);
   const lastSyncKeyRef = useRef("");
 
   const { data: evaluations = [], isLoading } = useQuery({
@@ -41,6 +44,10 @@ export default function Evaluations() {
   });
   const { data: appointments = [], isLoading: appointmentsLoading } = useQuery({
     queryKey: ["appointments"], queryFn: () => firebaseClient.entities.Appointment.list("-date_time", 1000),
+  });
+  const { data: dropdownOptions = DEFAULT_DROPDOWN_OPTIONS } = useQuery({
+    queryKey: DROPDOWN_OPTIONS_QUERY_KEY,
+    queryFn: getDropdownOptions,
   });
 
   const dueSyncKey = useMemo(
@@ -94,6 +101,19 @@ export default function Evaluations() {
   if (statusFilter === "open") visible = visible.filter((e) => e.status === "Pending" || e.status === "In Progress");
   else if (statusFilter !== "all") visible = visible.filter((e) => e.status === statusFilter);
 
+  const handleDownloadBlankSheet = async () => {
+    setDownloadingSheet(true);
+    try {
+      await downloadBlankEvaluationSheet(dropdownOptions);
+      toast.success("Blank evaluation sheet downloaded");
+    } catch (error) {
+      console.error("Evaluation worksheet download failed:", error);
+      toast.error("Could not create the evaluation sheet");
+    } finally {
+      setDownloadingSheet(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -101,14 +121,26 @@ export default function Evaluations() {
           <h1 className="text-2xl font-bold text-gray-900">Evaluations</h1>
           <p className="text-sm text-gray-500 mt-1">{visible.length} in queue</p>
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="open">Pending + In Progress</SelectItem>
-            <SelectItem value="all">All</SelectItem>
-            {EVALUATION_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="gap-2"
+            disabled={downloadingSheet}
+            onClick={handleDownloadBlankSheet}
+          >
+            <Download className="h-4 w-4" />
+            {downloadingSheet ? "Preparing sheet..." : "Blank Evaluation Sheet"}
+          </Button>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="open">Pending + In Progress</SelectItem>
+              <SelectItem value="all">All</SelectItem>
+              {EVALUATION_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-100">

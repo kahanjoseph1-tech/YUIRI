@@ -70,6 +70,11 @@ function questionnaireAnswer(evaluation, key) {
   return other ? `${answer}${answer ? " - " : ""}${other}` : answer;
 }
 
+function questionnaireNote(evaluation, key, keyPoint = false) {
+  const group = keyPoint ? "key_point_notes" : "question_notes";
+  return evaluation?.questionnaire?.[group]?.[key] || "";
+}
+
 function keyPointAnswer(evaluation, key) {
   return evaluation?.key_points?.[key] || "";
 }
@@ -155,11 +160,23 @@ const exportFields = [
     group: "Key Points",
     get: ({ evaluation }) => keyPointAnswer(evaluation, field.key),
   })),
+  ...keyPointFields.map((field) => ({
+    key: `key_point_${field.key}_notes`,
+    label: `${field.label} Notes`,
+    group: "Key Points",
+    get: ({ evaluation }) => questionnaireNote(evaluation, field.key, true),
+  })),
   ...questionnaireFields.map((field) => ({
     key: `question_${field.key}`,
     label: field.label,
     group: "Questionnaire",
     get: ({ evaluation }) => questionnaireAnswer(evaluation, field.key),
+  })),
+  ...questionnaireFields.map((field) => ({
+    key: `question_${field.key}_notes`,
+    label: `${field.label} Notes`,
+    group: "Questionnaire",
+    get: ({ evaluation }) => questionnaireNote(evaluation, field.key),
   })),
 ];
 
