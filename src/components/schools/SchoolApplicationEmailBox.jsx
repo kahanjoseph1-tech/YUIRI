@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { sendApplicationLinksEmail } from "@/lib/invoiceEmail";
 
 export default function SchoolApplicationEmailBox({ school }) {
   const [email, setEmail] = useState("");
@@ -28,7 +29,6 @@ export default function SchoolApplicationEmailBox({ school }) {
 
     setSending(true);
     try {
-      const { sendApplicationLinksEmail } = await import("@/lib/invoiceEmail");
       await sendApplicationLinksEmail({
         toEmail,
         schoolIds: [school.id],

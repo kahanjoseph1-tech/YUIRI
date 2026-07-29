@@ -6,6 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { sendApplicationLinksEmail } from "@/lib/invoiceEmail";
 
 function fullName(client) {
   return `${client?.boy_first_name || ""} ${client?.boy_last_name || ""}`.trim() || "Client";
@@ -68,7 +69,6 @@ export default function ApplicationLinksEmailDialog({ open, onOpenChange, client
 
     setSending(true);
     try {
-      const { sendApplicationLinksEmail } = await import("@/lib/invoiceEmail");
       await sendApplicationLinksEmail({
         toEmail,
         clientId: client.id,
