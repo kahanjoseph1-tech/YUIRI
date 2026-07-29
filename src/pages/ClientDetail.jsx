@@ -349,6 +349,10 @@ export default function ClientDetail() {
   const { data: appointments = [] } = useQuery({
     queryKey: ["appointments"], queryFn: () => firebaseClient.entities.Appointment.list("-date_time", 1000),
   });
+  const { data: availabilitySlots = [], isLoading: isLoadingAvailability } = useQuery({
+    queryKey: ["appointment-availability"],
+    queryFn: () => firebaseClient.entities.AppointmentAvailability.list("day_of_week", 500),
+  });
   const { data: evaluations = [] } = useQuery({
     queryKey: ["evaluations"], queryFn: () => firebaseClient.entities.Evaluation.list("-created_date", 1000),
   });
@@ -1347,6 +1351,10 @@ export default function ClientDetail() {
       <AppointmentFormDialog
         open={apptOpen} onOpenChange={setApptOpen}
         clients={clients} defaultClientId={id}
+        appointments={appointments}
+        availabilitySlots={availabilitySlots}
+        availabilityLoading={isLoadingAvailability}
+        requireAvailableEvaluationSlot
         onSave={(data) => createAppt.mutateAsync(data)}
       />
       <BillingFormDialog

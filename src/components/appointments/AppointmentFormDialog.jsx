@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,11 +39,76 @@ function startOfTodayInput() {
   return `${localDateKey(new Date())}T00:00`;
 }
 
+function localDateTimeValue(date, time) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}T${time || "09:00"}`;
+}
+
+function appointmentDateTimeKey(appointment) {
+  return toLocalInput(appointment?.date_time).slice(0, 16);
+}
+
+function appointmentBlocksSlot(appointment, dateTime, evaluatorName) {
+  if (["Cancelled", "No Show"].includes(appointment?.status)) return false;
+  if (appointmentDateTimeKey(appointment) !== dateTime) return false;
+
+  const slotEvaluator = String(evaluatorName || "").trim();
+  const appointmentEvaluator = String(appointment?.evaluator_name || "").trim();
+  return !slotEvaluator || !appointmentEvaluator || slotEvaluator === appointmentEvaluator;
+}
+
+function upcomingEvaluationSlots(availabilitySlots, appointments) {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const now = Date.now();
+  const slots = [];
+
+  for (let offset = 0; offset < 91; offset += 1) {
+    const day = new Date(start);
+    day.setDate(start.getDate() + offset);
+
+    availabilitySlots
+      .filter((slot) => slot.active !== false && Number(slot.day_of_week) === day.getDay())
+      .forEach((slot) => {
+        const dateTime = localDateTimeValue(day, slot.time);
+        if (new Date(dateTime).getTime() <= now) return;
+        if (appointments.some((appointment) => appointmentBlocksSlot(appointment, dateTime, slot.evaluator_name))) return;
+
+        slots.push({
+          key: `${slot.id || `${slot.day_of_week}-${slot.time}-${slot.evaluator_name || ""}`}:${dateTime}`,
+          date_time: dateTime,
+          evaluator_name: slot.evaluator_name || "",
+          location: slot.location || "Office",
+        });
+      });
+  }
+
+  return slots.sort((left, right) => left.date_time.localeCompare(right.date_time));
+}
+
+function evaluationSlotLabel(slot) {
+  const date = new Date(slot.date_time);
+  const dateLabel = new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+  return [dateLabel, slot.evaluator_name, slot.location].filter(Boolean).join(" - ");
+}
+
 export default function AppointmentFormDialog({
   open,
   onOpenChange,
   appointment,
   clients = [],
+  appointments = [],
+  availabilitySlots = [],
+  availabilityLoading = false,
+  requireAvailableEvaluationSlot = false,
   defaultClientId,
   defaultDateTime = "",
   defaultLocation = "Office",
@@ -93,6 +159,7 @@ export default function AppointmentFormDialog({
       payment_note: "",
       card_last4: "",
       notes: "",
+      available_slot_key: "",
     });
   }, [open, appointment, clients, defaultClientId, defaultDateTime, defaultLocation, defaultEvaluatorName]);
 
@@ -136,6 +203,12 @@ export default function AppointmentFormDialog({
   );
 
   const selectedClient = clients.find((c) => c.id === form.client_id);
+  const mustChooseAvailableSlot = requireAvailableEvaluationSlot && !appointment;
+  const availableEvaluationSlots = useMemo(
+    () => upcomingEvaluationSlots(availabilitySlots, appointments),
+    [availabilitySlots, appointments]
+  );
+  const selectedEvaluationSlot = availableEvaluationSlots.find((slot) => slot.key === form.available_slot_key) || null;
 
   const updateClient = (clientId) => {
     const nextClient = clients.find((c) => c.id === clientId);
@@ -154,12 +227,32 @@ export default function AppointmentFormDialog({
     }));
   };
 
+  const selectEvaluationSlot = (slotKey) => {
+    const slot = availableEvaluationSlots.find((candidate) => candidate.key === slotKey);
+    if (!slot) return;
+    setForm((current) => ({
+      ...current,
+      available_slot_key: slot.key,
+      date_time: slot.date_time,
+      evaluator_id: "",
+      evaluator_name: slot.evaluator_name,
+      location: slot.location || "Office",
+      meeting_type: "Evaluation",
+    }));
+  };
+
   const handleSave = async () => {
+    if (mustChooseAvailableSlot && !selectedEvaluationSlot) {
+      toast.error("Choose an available evaluation slot.");
+      return;
+    }
+
     setSaving(true);
     try {
       const client = clients.find((c) => c.id === form.client_id);
+      const { available_slot_key, ...appointmentData } = form;
       await onSave({
-        ...form,
+        ...appointmentData,
         evaluator_id: "",
         date_time: form.date_time ? new Date(form.date_time).toISOString() : null,
         meeting_type: form.meeting_type || "Evaluation",
@@ -203,48 +296,72 @@ export default function AppointmentFormDialog({
               placeholder="Select client"
             />
           </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-gray-500">Evaluator</Label>
-            <Select value={evaluatorSelectValue} onValueChange={updateEvaluator}>
-              <SelectTrigger><SelectValue placeholder="Select evaluator" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Unassigned</SelectItem>
-                {evaluatorNameOptions.map((name) => (
-                  <SelectItem key={`name:${name}`} value={`name:${name}`}>{name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
+          {mustChooseAvailableSlot ? (
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-gray-500">Date & Time *</Label>
-              <Input
-                type="datetime-local"
-                min={!appointment ? startOfTodayInput() : undefined}
-                value={form.date_time || ""}
-                onChange={(e) => update("date_time", e.target.value)}
-              />
-              {isBackdatedNewAppointment && (
-                <p className="text-xs text-red-600">New appointments cannot be scheduled before today.</p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-gray-500">Type</Label>
+              <Label className="text-xs font-medium text-gray-500">Available Evaluation Slot *</Label>
               <Select
-                value={form.meeting_type}
-                onValueChange={(v) => {
-                  setForm((current) => ({
-                    ...current,
-                    meeting_type: v,
-                    payment_amount_due: v === "Evaluation" && !current.payment_amount_due ? 300 : current.payment_amount_due,
-                  }));
-                }}
+                value={form.available_slot_key || ""}
+                onValueChange={selectEvaluationSlot}
+                disabled={availabilityLoading || availableEvaluationSlots.length === 0}
               >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{meetingTypeOptions.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                <SelectTrigger><SelectValue placeholder={availabilityLoading ? "Loading available slots..." : "Select an open evaluation slot"} /></SelectTrigger>
+                <SelectContent>
+                  {availableEvaluationSlots.map((slot) => (
+                    <SelectItem key={slot.key} value={slot.key}>{evaluationSlotLabel(slot)}</SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
+              {!availabilityLoading && availableEvaluationSlots.length === 0 && (
+                <p className="text-xs text-amber-700">No open evaluation slots are available in the next 90 days.</p>
+              )}
+              <p className="text-xs text-gray-400">Evaluator, date, time, and location are set from the selected available slot.</p>
             </div>
-          </div>
+          ) : (
+            <>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-gray-500">Evaluator</Label>
+                <Select value={evaluatorSelectValue} onValueChange={updateEvaluator}>
+                  <SelectTrigger><SelectValue placeholder="Select evaluator" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Unassigned</SelectItem>
+                    {evaluatorNameOptions.map((name) => (
+                      <SelectItem key={`name:${name}`} value={`name:${name}`}>{name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-gray-500">Date & Time *</Label>
+                  <Input
+                    type="datetime-local"
+                    min={!appointment ? startOfTodayInput() : undefined}
+                    value={form.date_time || ""}
+                    onChange={(e) => update("date_time", e.target.value)}
+                  />
+                  {isBackdatedNewAppointment && (
+                    <p className="text-xs text-red-600">New appointments cannot be scheduled before today.</p>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-gray-500">Type</Label>
+                  <Select
+                    value={form.meeting_type}
+                    onValueChange={(v) => {
+                      setForm((current) => ({
+                        ...current,
+                        meeting_type: v,
+                        payment_amount_due: v === "Evaluation" && !current.payment_amount_due ? 300 : current.payment_amount_due,
+                      }));
+                    }}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{meetingTypeOptions.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </>
+          )}
           <div className="space-y-1.5">
             <Label className="text-xs font-medium text-gray-500">Who is coming</Label>
             <div className="grid grid-cols-1 sm:grid-cols-[11rem_minmax(0,1fr)] gap-2">
@@ -334,7 +451,7 @@ export default function AppointmentFormDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSave} disabled={saving || !form.client_id || !form.date_time || isBackdatedNewAppointment} className="bg-[#1e3a5f] hover:bg-[#1e3a5f]/90">
+          <Button onClick={handleSave} disabled={saving || !form.client_id || !form.date_time || isBackdatedNewAppointment || (mustChooseAvailableSlot && (!selectedEvaluationSlot || availabilityLoading))} className="bg-[#1e3a5f] hover:bg-[#1e3a5f]/90">
             {saving ? "Saving..." : appointment ? "Update" : "Create"}
           </Button>
         </DialogFooter>
