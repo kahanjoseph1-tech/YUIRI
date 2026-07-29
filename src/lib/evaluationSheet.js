@@ -249,8 +249,160 @@ function buildWorksheet(dropdownOptions) {
   return container;
 }
 
-export async function downloadBlankEvaluationSheet(dropdownOptions) {
-  const container = buildWorksheet(dropdownOptions);
+function addCompactKeyPoint(container, question) {
+  const row = element("section", {
+    minWidth: "0",
+    marginBottom: "3px",
+    direction: "rtl",
+  });
+  const response = element("div", {
+    display: "flex",
+    alignItems: "flex-end",
+    gap: "3px",
+    color: "#0f172a",
+    fontSize: "6.5px",
+    fontWeight: "700",
+    lineHeight: "1.1",
+  });
+  response.append(
+    element("span", { whiteSpace: "nowrap" }, question.label),
+    element("span", { fontSize: "6px", fontWeight: "400" }, "[ ]"),
+    element("div", { flex: "1", minWidth: "14px", borderBottom: "1px solid #94a3b8", height: "7px" }),
+  );
+  row.append(response);
+  addWritingLines(row, "Notes");
+  container.append(row);
+}
+
+function addCompactEvaluationQuestion(container, question, answerLabel = "Notes") {
+  const row = element("section", {
+    minWidth: "0",
+    marginBottom: "3px",
+    direction: "rtl",
+  });
+  row.append(element("div", {
+    color: "#0f172a",
+    fontSize: "6.3px",
+    fontWeight: "700",
+    lineHeight: "1.12",
+    textAlign: "right",
+  }, question.label));
+  addWritingLines(row, answerLabel, question.key === "notes" ? 2 : 1);
+  container.append(row);
+}
+
+function buildKeyPointsMiniSheet() {
+  const sheet = element("section", {
+    minWidth: "0",
+    height: "100%",
+    boxSizing: "border-box",
+    padding: "7px",
+    border: "1px solid #cbd5e1",
+    borderRadius: "3px",
+    background: "#ffffff",
+    color: "#0f172a",
+    fontFamily: "Arial, Helvetica, sans-serif",
+    overflow: "hidden",
+  });
+
+  const header = element("header", {
+    display: "flex",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: "8px",
+    borderBottom: "1px solid #1e3a5f",
+    paddingBottom: "3px",
+    marginBottom: "4px",
+  });
+  header.append(
+    element("div", { color: "#1e3a5f", fontSize: "8px", fontWeight: "700" }, "Yuiri Support CRM"),
+    element("div", { color: "#0f172a", fontSize: "8px", fontWeight: "700" }, "Key Points & Evaluation"),
+  );
+  sheet.append(header);
+
+  const columns = element("div", {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+    gap: "7px",
+    height: "calc(100% - 17px)",
+    alignItems: "start",
+  });
+  const leftColumn = element("div", { minWidth: "0" });
+  const rightColumn = element("div", { minWidth: "0" });
+  columns.append(leftColumn, rightColumn);
+  sheet.append(columns);
+
+  addSectionHeading(leftColumn, "Key Points");
+  keyPointQuestions.slice(0, 2).forEach((question) => addCompactKeyPoint(leftColumn, question));
+  addSectionHeading(rightColumn, "Key Points");
+  keyPointQuestions.slice(2).forEach((question) => addCompactKeyPoint(rightColumn, question));
+
+  addSectionHeading(leftColumn, "Evaluation");
+  const evaluationQuestions = [
+    ...singleChoiceQuestions,
+    ...checkboxQuestions,
+    ...longAnswerQuestions,
+  ];
+  const splitAt = Math.ceil(evaluationQuestions.length / 2);
+  evaluationQuestions.slice(0, splitAt).forEach((question) => {
+    addCompactEvaluationQuestion(leftColumn, question, question.key === "liked_current_yeshiva" ? "Answer" : "Notes");
+  });
+  addSectionHeading(rightColumn, "Evaluation");
+  evaluationQuestions.slice(splitAt).forEach((question) => {
+    addCompactEvaluationQuestion(rightColumn, question, question.key === "reason_switching_yeshiva" ? "Answer" : "Notes");
+  });
+
+  return sheet;
+}
+
+function buildKeyPointsWorksheet() {
+  const container = element("div", {
+    position: "fixed",
+    left: "-10000px",
+    top: "0",
+    width: `${PAGE_WIDTH}px`,
+    zIndex: "-1",
+  });
+  const page = element("article", {
+    width: `${PAGE_WIDTH}px`,
+    height: `${PAGE_HEIGHT}px`,
+    boxSizing: "border-box",
+    padding: "12px 14px",
+    background: "#ffffff",
+    position: "relative",
+    overflow: "hidden",
+  });
+  const forms = element("div", {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+    gridTemplateRows: "minmax(0, 1fr) minmax(0, 1fr)",
+    gap: "10px",
+    height: "100%",
+  });
+  for (let index = 0; index < 4; index += 1) forms.append(buildKeyPointsMiniSheet());
+  page.append(forms);
+
+  [
+    { top: "8px", bottom: "8px", left: "50%", borderLeft: "1px dashed #94a3b8" },
+    { left: "8px", right: "8px", top: "50%", borderTop: "1px dashed #94a3b8" },
+  ].forEach((styles) => page.append(element("div", { position: "absolute", ...styles })));
+  page.append(element("div", {
+    position: "absolute",
+    top: "2px",
+    left: "50%",
+    transform: "translateX(-50%)",
+    padding: "0 4px",
+    color: "#64748b",
+    background: "#ffffff",
+    fontFamily: "Arial, Helvetica, sans-serif",
+    fontSize: "5px",
+  }, "Cut here"));
+
+  container.append(page);
+  return container;
+}
+
+async function downloadWorksheet(container, filename) {
   document.body.append(container);
 
   try {
@@ -279,8 +431,16 @@ export async function downloadBlankEvaluationSheet(dropdownOptions) {
       undefined,
       "FAST",
     );
-    doc.save("Yuiri-Blank-Evaluation-Worksheet.pdf");
+    doc.save(filename);
   } finally {
     container.remove();
   }
+}
+
+export async function downloadBlankEvaluationSheet(dropdownOptions) {
+  await downloadWorksheet(buildWorksheet(dropdownOptions), "Yuiri-Blank-Evaluation-Worksheet.pdf");
+}
+
+export async function downloadKeyPointsEvaluationSheet() {
+  await downloadWorksheet(buildKeyPointsWorksheet(), "Yuiri-Key-Points-Evaluation-Worksheet.pdf");
 }
