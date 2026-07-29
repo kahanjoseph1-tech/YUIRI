@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Eye, FileText, GraduationCap, ImageIcon, Plus, Trash2, UploadCloud } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { firebaseClient } from "@/api/firebaseClient";
 import {
   AlertDialog,
@@ -24,7 +23,7 @@ import {
   getDropdownOptions,
   uniqueOptions,
 } from "@/lib/dropdownSettings";
-import { storage } from "@/lib/firebase";
+import { uploadClientFile as uploadClientFileToServer } from "@/lib/clientFileUpload";
 import Combobox from "@/components/common/Combobox";
 import SchoolFormDialog from "@/components/schools/SchoolFormDialog";
 import SchoolInfoDialog from "@/components/schools/SchoolInfoDialog";
@@ -43,10 +42,6 @@ const emptyPhoneRow = () => ({ tag: "Father's Cell", custom_label: "", number: "
 
 function makeId() {
   return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function safeFileName(name) {
-  return String(name || "file").replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "file";
 }
 
 function formatFileSize(bytes) {
@@ -78,18 +73,7 @@ function formSnapshot({ form, phoneRows, needsText, pendingPhoto, pendingFiles }
 async function uploadClientFile(file, clientKey, folder) {
   const fileLabel = folder === "profile" ? "profile picture" : "file";
   try {
-    const path = `clients/${clientKey}/${folder}/${makeId()}-${safeFileName(file.name)}`;
-    const fileRef = ref(storage, path);
-    await uploadBytes(fileRef, file, { contentType: file.type || "application/octet-stream" });
-    const url = await getDownloadURL(fileRef);
-    return {
-      name: file.name,
-      url,
-      path,
-      content_type: file.type || "",
-      size: file.size || 0,
-      uploaded_date: new Date().toISOString(),
-    };
+    return await uploadClientFileToServer(file, clientKey, folder);
   } catch (error) {
     const uploadError = new Error(error?.message || `Unable to upload ${fileLabel}.`);
     uploadError.code = error?.code || "";
@@ -104,6 +88,10 @@ function uploadErrorMessage(error) {
   switch (error.code) {
     case "storage/unauthorized":
       return `The ${label} was blocked by Firebase Storage permissions. Please sign out, sign in again, and try once more.`;
+    case "functions/permission-denied":
+      return "Your Yuiri account is not approved to upload client files.";
+    case "functions/invalid-argument":
+      return error.message || `The ${label} is not valid for upload.`;
     case "storage/quota-exceeded":
       return `The ${label} could not be uploaded because Firebase Storage has reached its quota.`;
     case "storage/bucket-not-found":

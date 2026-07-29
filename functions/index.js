@@ -1,11 +1,14 @@
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 import { defineSecret } from "firebase-functions/params";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { randomUUID } from "node:crypto";
 
 initializeApp();
 
 const db = getFirestore();
+const clientStorage = getStorage().bucket("yuiri-1f4d3.firebasestorage.app");
 
 const GMAIL_CLIENT_ID = defineSecret("GMAIL_CLIENT_ID");
 const GMAIL_CLIENT_SECRET = defineSecret("GMAIL_CLIENT_SECRET");
@@ -13,6 +16,7 @@ const GMAIL_REFRESH_TOKEN = defineSecret("GMAIL_REFRESH_TOKEN");
 const GMAIL_SENDER_EMAIL = defineSecret("GMAIL_SENDER_EMAIL");
 
 const MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024;
+const MAX_CLIENT_FILE_BYTES = 7 * 1024 * 1024;
 
 function cleanString(value, fallback = "") {
   return String(value || fallback).trim();
@@ -63,6 +67,28 @@ function safeFileName(value) {
 
 function stripDataUri(value) {
   return cleanString(value).replace(/^data:application\/pdf;base64,/i, "");
+}
+
+function safeUploadedFileName(value) {
+  return cleanString(value, "file")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "") || "file";
+}
+
+function safeClientPathSegment(value) {
+  return cleanString(value, "new-client")
+    .replace(/[^a-zA-Z0-9_-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "") || "new-client";
+}
+
+function cleanBase64(value) {
+  return cleanString(value).replace(/^data:[^;,]+;base64,/i, "").replace(/\s/g, "");
+}
+
+function firebaseDownloadUrl(bucketName, objectPath, downloadToken) {
+  return `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodeURIComponent(objectPath)}?alt=media&token=${downloadToken}`;
 }
 
 function senderDisplayName() {
@@ -182,7 +208,7 @@ async function requireApprovedUser(uid) {
   }
 
   const user = snapshot.data() || {};
-  if (user.approval_status !== "approved") {
+  if (cleanString(user.approval_status).toLowerCase() !== "approved") {
     throw new HttpsError("permission-denied", "Your Yuiri account is not approved yet.");
   }
   return user;
@@ -194,6 +220,57 @@ async function readOptionalDocument(collectionName, id) {
   const snapshot = await db.collection(collectionName).doc(cleanId).get();
   return snapshot.exists ? { id: snapshot.id, ...snapshot.data() } : null;
 }
+
+export const uploadClientFile = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    await requireApprovedUser(request.auth?.uid);
+    const data = request.data || {};
+    const folder = cleanString(data.folder);
+    if (!["profile", "files"].includes(folder)) {
+      throw new HttpsError("invalid-argument", "Choose a valid client upload folder.");
+    }
+
+    const fileName = safeUploadedFileName(data.fileName);
+    const contentType = cleanString(data.contentType, "application/octet-stream");
+    const fileBase64 = cleanBase64(data.fileBase64);
+    if (!fileBase64) {
+      throw new HttpsError("invalid-argument", "Choose a file to upload.");
+    }
+
+    const bytes = Buffer.from(fileBase64, "base64");
+    if (bytes.length === 0 || bytes.length > MAX_CLIENT_FILE_BYTES) {
+      throw new HttpsError("invalid-argument", "Client files must be smaller than 7 MB.");
+    }
+
+    const clientKey = safeClientPathSegment(data.clientKey);
+    const path = `clients/${clientKey}/${folder}/${randomUUID()}-${fileName}`;
+    const downloadToken = randomUUID();
+    const target = clientStorage.file(path);
+    await target.save(bytes, {
+      resumable: false,
+      metadata: {
+        contentType,
+        cacheControl: "public,max-age=31536000,immutable",
+        contentDisposition: folder === "profile" ? "inline" : `attachment; filename="${fileName}"`,
+        metadata: {
+          firebaseStorageDownloadTokens: downloadToken,
+          uploadedBy: request.auth.uid,
+        },
+      },
+    });
+
+    const uploadedDate = new Date().toISOString();
+    return {
+      name: fileName,
+      path,
+      url: firebaseDownloadUrl(clientStorage.name, path, downloadToken),
+      content_type: contentType,
+      size: bytes.length,
+      uploaded_date: uploadedDate,
+    };
+  },
+);
 
 async function getAccessToken() {
   const response = await fetch("https://oauth2.googleapis.com/token", {
