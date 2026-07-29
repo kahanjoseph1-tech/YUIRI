@@ -76,18 +76,45 @@ function formSnapshot({ form, phoneRows, needsText, pendingPhoto, pendingFiles }
 }
 
 async function uploadClientFile(file, clientKey, folder) {
-  const path = `clients/${clientKey}/${folder}/${makeId()}-${safeFileName(file.name)}`;
-  const fileRef = ref(storage, path);
-  await uploadBytes(fileRef, file, { contentType: file.type || "application/octet-stream" });
-  const url = await getDownloadURL(fileRef);
-  return {
-    name: file.name,
-    url,
-    path,
-    content_type: file.type || "",
-    size: file.size || 0,
-    uploaded_date: new Date().toISOString(),
-  };
+  const fileLabel = folder === "profile" ? "profile picture" : "file";
+  try {
+    const path = `clients/${clientKey}/${folder}/${makeId()}-${safeFileName(file.name)}`;
+    const fileRef = ref(storage, path);
+    await uploadBytes(fileRef, file, { contentType: file.type || "application/octet-stream" });
+    const url = await getDownloadURL(fileRef);
+    return {
+      name: file.name,
+      url,
+      path,
+      content_type: file.type || "",
+      size: file.size || 0,
+      uploaded_date: new Date().toISOString(),
+    };
+  } catch (error) {
+    const uploadError = new Error(error?.message || `Unable to upload ${fileLabel}.`);
+    uploadError.code = error?.code || "";
+    uploadError.isClientFileUpload = true;
+    uploadError.fileLabel = fileLabel;
+    throw uploadError;
+  }
+}
+
+function uploadErrorMessage(error) {
+  const label = error.fileLabel || "file";
+  switch (error.code) {
+    case "storage/unauthorized":
+      return `The ${label} was blocked by Firebase Storage permissions. Please sign out, sign in again, and try once more.`;
+    case "storage/quota-exceeded":
+      return `The ${label} could not be uploaded because Firebase Storage has reached its quota.`;
+    case "storage/bucket-not-found":
+      return "The Firebase Storage bucket was not found. Please contact the administrator.";
+    case "storage/retry-limit-exceeded":
+      return `The ${label} upload timed out. Please check your connection and try again.`;
+    case "storage/invalid-checksum":
+      return `The ${label} upload was interrupted. Please try again.`;
+    default:
+      return `The ${label} could not be uploaded. Your client changes were not saved. (${error.code || "Firebase Storage error"})`;
+  }
 }
 
 function phoneRowsFromClient(client) {
@@ -330,17 +357,12 @@ export default function ClientFormDrawer({ open, onOpenChange, client, onSave })
       let uploadedPhoto = form.profile_photo || null;
       let uploadedFiles = [];
 
-      try {
-        uploadedPhoto = pendingPhoto
-          ? await uploadClientFile(pendingPhoto, clientKey, "profile")
-          : uploadedPhoto;
-        uploadedFiles = pendingFiles.length > 0
-          ? await Promise.all(pendingFiles.map((file) => uploadClientFile(file, clientKey, "files")))
-          : [];
-      } catch (uploadError) {
-        console.error("Client file upload failed:", uploadError);
-        toast.error("File upload failed. Saving the client without the new files.");
-      }
+      uploadedPhoto = pendingPhoto
+        ? await uploadClientFile(pendingPhoto, clientKey, "profile")
+        : uploadedPhoto;
+      uploadedFiles = pendingFiles.length > 0
+        ? await Promise.all(pendingFiles.map((file) => uploadClientFile(file, clientKey, "files")))
+        : [];
 
       await onSave({
         ...form,
@@ -363,7 +385,7 @@ export default function ClientFormDrawer({ open, onOpenChange, client, onSave })
       closeWithoutPrompt();
     } catch (error) {
       console.error("Client save failed:", error);
-      toast.error(error?.message || "Failed to save client");
+      toast.error(error?.isClientFileUpload ? uploadErrorMessage(error) : (error?.message || "Failed to save client"));
     } finally {
       setSaving(false);
     }
