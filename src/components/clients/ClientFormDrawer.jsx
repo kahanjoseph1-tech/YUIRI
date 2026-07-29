@@ -124,6 +124,7 @@ export default function ClientFormDrawer({ open, onOpenChange, client, onSave })
   const [phoneRows, setPhoneRows] = useState([emptyPhoneRow()]);
   const [needsText, setNeedsText] = useState("");
   const [pendingPhoto, setPendingPhoto] = useState(null);
+  const [pendingPhotoPreview, setPendingPhotoPreview] = useState("");
   const [pendingFiles, setPendingFiles] = useState([]);
   const [draggingFiles, setDraggingFiles] = useState(false);
   const [addSchoolOpen, setAddSchoolOpen] = useState(false);
@@ -193,6 +194,17 @@ export default function ClientFormDrawer({ open, onOpenChange, client, onSave })
     }
   }, [open, client]);
 
+  useEffect(() => {
+    if (!pendingPhoto) {
+      setPendingPhotoPreview("");
+      return undefined;
+    }
+
+    const previewUrl = URL.createObjectURL(pendingPhoto);
+    setPendingPhotoPreview(previewUrl);
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [pendingPhoto]);
+
   const callerOptions = useMemo(
     () => uniqueOptions([...(dropdownOptions.caller_options || []), form.caller_source]),
     [dropdownOptions.caller_options, form.caller_source]
@@ -240,6 +252,7 @@ export default function ClientFormDrawer({ open, onOpenChange, client, onSave })
   const hasUnsavedChanges = open && currentSnapshot !== initialSnapshotRef.current;
   const canSaveFinal = Boolean(form.boy_first_name && form.boy_last_name);
   const hasAnyDraftContent = hasUnsavedChanges || Boolean(form.boy_first_name || form.boy_last_name || form.father_name || form.parent_email || form.current_school);
+  const profilePhotoPreviewUrl = pendingPhotoPreview || form.profile_photo?.url || "";
 
   const update = (field, value) => setForm((p) => ({ ...p, [field]: value }));
 
@@ -389,8 +402,8 @@ export default function ClientFormDrawer({ open, onOpenChange, client, onSave })
           <Field label="Profile picture" full>
             <div className="flex flex-col sm:flex-row gap-3 rounded-lg border border-gray-100 p-3">
               <div className="h-20 w-20 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center overflow-hidden shrink-0">
-                {form.profile_photo?.url && !pendingPhoto ? (
-                  <img src={form.profile_photo.url} alt="Client profile" className="h-full w-full object-cover" />
+                {profilePhotoPreviewUrl ? (
+                  <img src={profilePhotoPreviewUrl} alt="Client profile preview" className="h-full w-full object-cover" />
                 ) : (
                   <ImageIcon className="h-8 w-8 text-gray-300" />
                 )}
