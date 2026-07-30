@@ -12,8 +12,7 @@ import EvaluationFormDialog from "@/components/evaluations/EvaluationFormDialog"
 import { EVALUATION_STATUSES } from "@/lib/constants";
 import { onEvaluationCompleted, syncDueEvaluationAppointments } from "@/lib/automations";
 import { fmtDate, fmtDateTime } from "@/lib/format";
-import { DEFAULT_DROPDOWN_OPTIONS, DROPDOWN_OPTIONS_QUERY_KEY, getDropdownOptions } from "@/lib/dropdownSettings";
-import { downloadBlankEvaluationSheet, downloadKeyPointsEvaluationSheet } from "@/lib/evaluationSheet";
+import { downloadBlankEvaluationSheet } from "@/lib/evaluationSheet";
 
 function localDateKey(value) {
   const date = value ? new Date(value) : null;
@@ -38,7 +37,6 @@ export default function Evaluations() {
   const [statusFilter, setStatusFilter] = useState("open");
   const [active, setActive] = useState(null);
   const [downloadingSheet, setDownloadingSheet] = useState(false);
-  const [downloadingKeyPointsSheet, setDownloadingKeyPointsSheet] = useState(false);
   const lastSyncKeyRef = useRef("");
 
   const { data: evaluations = [], isLoading } = useQuery({
@@ -47,11 +45,6 @@ export default function Evaluations() {
   const { data: appointments = [], isLoading: appointmentsLoading } = useQuery({
     queryKey: ["appointments"], queryFn: () => firebaseClient.entities.Appointment.list("-date_time", 1000),
   });
-  const { data: dropdownOptions = DEFAULT_DROPDOWN_OPTIONS } = useQuery({
-    queryKey: DROPDOWN_OPTIONS_QUERY_KEY,
-    queryFn: getDropdownOptions,
-  });
-
   const dueSyncKey = useMemo(
     () => appointments
       .filter((appointment) => (appointment.meeting_type || "Evaluation") === "Evaluation")
@@ -106,26 +99,13 @@ export default function Evaluations() {
   const handleDownloadBlankSheet = async () => {
     setDownloadingSheet(true);
     try {
-      await downloadBlankEvaluationSheet(dropdownOptions);
+      await downloadBlankEvaluationSheet();
       toast.success("Blank evaluation sheet downloaded");
     } catch (error) {
       console.error("Evaluation worksheet download failed:", error);
       toast.error("Could not create the evaluation sheet");
     } finally {
       setDownloadingSheet(false);
-    }
-  };
-
-  const handleDownloadKeyPointsSheet = async () => {
-    setDownloadingKeyPointsSheet(true);
-    try {
-      await downloadKeyPointsEvaluationSheet();
-      toast.success("Key points evaluation sheet downloaded");
-    } catch (error) {
-      console.error("Key points evaluation worksheet download failed:", error);
-      toast.error("Could not create the key points sheet");
-    } finally {
-      setDownloadingKeyPointsSheet(false);
     }
   };
 
@@ -136,29 +116,17 @@ export default function Evaluations() {
           <h1 className="text-2xl font-bold text-gray-900">Evaluations</h1>
           <p className="text-sm text-gray-500 mt-1">{visible.length} in queue</p>
         </div>
-        <div className="flex flex-wrap items-start gap-2">
-          <div className="flex flex-col items-stretch gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="gap-2"
-              disabled={downloadingSheet}
-              onClick={handleDownloadBlankSheet}
-            >
-              <Download className="h-4 w-4" />
-              {downloadingSheet ? "Preparing sheet..." : "Blank Evaluation Sheet"}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="gap-2"
-              disabled={downloadingKeyPointsSheet}
-              onClick={handleDownloadKeyPointsSheet}
-            >
-              <Download className="h-4 w-4" />
-              {downloadingKeyPointsSheet ? "Preparing key points..." : "Key Points Sheet (4 per page)"}
-            </Button>
-          </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="gap-2"
+            disabled={downloadingSheet}
+            onClick={handleDownloadBlankSheet}
+          >
+            <Download className="h-4 w-4" />
+            {downloadingSheet ? "Preparing sheet..." : "Blank Evaluation Sheet"}
+          </Button>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
             <SelectContent>
